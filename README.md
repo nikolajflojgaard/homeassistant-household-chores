@@ -75,6 +75,7 @@ The screenshots below are updated with each UI/layout release.
 - The custom card JavaScript is auto-registered by the integration at startup.
 - JS resource is auto versioned (`?v=<manifest version>`) to reduce browser cache issues after updates.
 - If you update from older versions, restart Home Assistant to reload websocket commands/resources.
+- Save operations now include a fallback service (`household_chores.save_board`) if websocket save command is unavailable in runtime.
 - Default chores/members entered during integration setup are used as starter board data.
 - The card layout is optimized for tablet-sized dashboards (including iPad-width screens).
 - Tasks moved to `Done` are automatically deleted nightly at `03:00` (Home Assistant local time).

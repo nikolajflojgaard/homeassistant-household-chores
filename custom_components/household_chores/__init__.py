@@ -28,6 +28,7 @@ from .const import (
 )
 from .coordinator import HouseholdChoresCoordinator
 from .frontend import async_register_card
+from .services import async_register as async_register_services
 from .websocket_api import async_register as async_register_ws
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +46,9 @@ async def async_setup(hass: HomeAssistant, _config: dict[str, Any]) -> bool:
     if not domain_data.get("card_registered"):
         await async_register_card(hass)
         domain_data["card_registered"] = True
+    if not domain_data.get("services_registered"):
+        await async_register_services(hass)
+        domain_data["services_registered"] = True
     return True
 
 
@@ -79,6 +83,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not domain_data.get("card_registered"):
         await async_register_card(hass)
         domain_data["card_registered"] = True
+    if not domain_data.get("services_registered"):
+        await async_register_services(hass)
+        domain_data["services_registered"] = True
 
     name = entry.options.get(CONF_NAME, entry.data.get(CONF_NAME, DEFAULT_NAME))
     members = _as_list(entry.options.get(CONF_MEMBERS, entry.data.get(CONF_MEMBERS)), DEFAULT_MEMBERS)

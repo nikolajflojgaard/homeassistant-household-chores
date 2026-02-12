@@ -230,7 +230,20 @@ class HouseholdChoresCard extends HTMLElement {
       this._board = this._normalizeBoard(result.board || this._board);
       this._error = "";
     } catch (err) {
-      this._error = `Failed to save board: ${err?.message || err}`;
+      const message = String(err?.message || err || "");
+      if (message.toLowerCase().includes("unknown command")) {
+        try {
+          await this._hass.callService("household_chores", "save_board", {
+            entry_id: this._config.entry_id,
+            board: this._board,
+          });
+          this._error = "";
+        } catch (serviceErr) {
+          this._error = `Failed to save board: ${serviceErr?.message || serviceErr}`;
+        }
+      } else {
+        this._error = `Failed to save board: ${message}`;
+      }
     } finally {
       this._saving = false;
       this._render();
