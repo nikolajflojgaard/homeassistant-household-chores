@@ -744,7 +744,24 @@ class HouseholdChoresCard extends HTMLElement {
         .assignees label{display:flex;align-items:center;gap:5px;font-size:.78rem}
         .modal-actions{display:flex;justify-content:space-between;gap:8px}
         .danger{background:#b91c1c;color:#fff;border-color:transparent}
-        @media (max-width:900px){.side-columns{grid-template-columns:1fr}.column h3{font-size:.76rem}.task-title{font-size:.73rem}}
+        @media (max-width:900px){
+          .side-columns{grid-template-columns:1fr}
+          .column h3{font-size:.76rem}
+          .task-title{font-size:.73rem}
+          .side-columns .column.side-lane .tasks{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+            overflow-x:visible;
+            overflow-y:visible;
+            gap:6px;
+            padding-bottom:0;
+          }
+          .side-columns .column.side-lane .task{
+            min-width:0;
+            width:auto;
+            flex:none;
+          }
+        }
       </style>
 
       <ha-card header="${this._escape(this._config.title)}">
