@@ -58,7 +58,8 @@ entry_id: 0123456789abcdef0123456789abcdef
 - Default chores/members entered during integration setup are used as starter board data.
 - The card layout is optimized for tablet-sized dashboards (including iPad-width screens).
 - Tasks moved to `Done` are automatically deleted nightly at `03:00` (Home Assistant local time).
-- Every Sunday at `00:30` (local time), the board is refreshed:
+- Weekly board refresh time is configurable in integration options (`day`, `hour`, `minute`).
+- On weekly refresh:
   - tasks without an `end date` are removed
   - expired tasks are removed
   - fixed recurring tasks are rebuilt for the upcoming Monday-Sunday week (until their end date)

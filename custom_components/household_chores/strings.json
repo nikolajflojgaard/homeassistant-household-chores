@@ -8,7 +8,10 @@
         "data": {
           "name": "Household name",
           "members": "Members (comma-separated)",
-          "chores": "Chores (comma-separated)"
+          "chores": "Chores (comma-separated)",
+          "refresh_weekday": "Weekly refresh day",
+          "refresh_hour": "Weekly refresh hour (0-23)",
+          "refresh_minute": "Weekly refresh minute (0-59)"
         }
       }
     },
@@ -27,7 +30,10 @@
         "data": {
           "name": "Household name",
           "members": "Members (comma-separated)",
-          "chores": "Chores (comma-separated)"
+          "chores": "Chores (comma-separated)",
+          "refresh_weekday": "Weekly refresh day",
+          "refresh_hour": "Weekly refresh hour (0-23)",
+          "refresh_minute": "Weekly refresh minute (0-59)"
         }
       }
     },
