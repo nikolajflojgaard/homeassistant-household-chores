@@ -384,6 +384,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   _onPersonNameInput(ev) {
     this._newPersonName = ev.target.value;
+    this._updateSubmitButtons();
   }
 
   async _onAddPerson(ev) {
@@ -417,6 +418,23 @@ class HouseholdChoresCard extends HTMLElement {
 
   _onTaskFieldInput(field, value) {
     this._taskForm = { ...this._taskForm, [field]: value };
+    this._updateSubmitButtons();
+  }
+
+  _canSubmitPersonForm() {
+    return Boolean(this._newPersonName.trim());
+  }
+
+  _canSubmitTaskForm() {
+    return Boolean(this._taskForm.title && this._taskForm.title.trim()) && !this._saving;
+  }
+
+  _updateSubmitButtons() {
+    const personSubmit = this.shadowRoot?.querySelector("#person-submit");
+    if (personSubmit) personSubmit.disabled = !this._canSubmitPersonForm();
+
+    const taskSubmit = this.shadowRoot?.querySelector("#task-submit");
+    if (taskSubmit) taskSubmit.disabled = !this._canSubmitTaskForm();
   }
 
   _toggleTaskAssignee(personId) {
@@ -763,7 +781,7 @@ class HouseholdChoresCard extends HTMLElement {
             <div class="small">Without fixed: selected weekdays create one-off tasks for this week and do not require end date.</div>
             <div class="modal-actions">
               ${form.mode === "edit" ? '<button type="button" class="danger" id="delete-task">Delete</button>' : ""}
-              <button type="submit" ${this._saving ? "disabled" : ""}>${this._saving ? "Saving..." : form.mode === "edit" ? "Save" : "Create"}</button>
+              <button id="task-submit" type="submit" ${this._canSubmitTaskForm() ? "" : "disabled"}>${this._saving ? "Saving..." : form.mode === "edit" ? "Save" : "Create"}</button>
             </div>
           </form>
         </div>
@@ -782,7 +800,7 @@ class HouseholdChoresCard extends HTMLElement {
           </div>
           <form class="row" id="person-form">
             <input id="person-name" type="text" placeholder="Add person" value="${this._escape(this._newPersonName)}" />
-            <button type="submit">Add</button>
+            <button id="person-submit" type="submit" ${this._canSubmitPersonForm() ? "" : "disabled"}>Add</button>
           </form>
           <div class="small">Tip: drag a person badge onto any task to assign.</div>
           <div style="margin-top:8px;">${this._renderPeopleLegend()}</div>
@@ -805,6 +823,7 @@ class HouseholdChoresCard extends HTMLElement {
         .panel{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:14px;padding:10px}
         .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .action-btn{font:inherit;border-radius:10px;border:1px solid transparent;padding:10px;background:var(--hc-accent);color:#fff;font-weight:700;cursor:pointer}
+        button:disabled{background:#cbd5e1 !important;color:#64748b !important;border-color:#cbd5e1 !important;cursor:not-allowed;opacity:1}
         .legend-inline{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
         .person-pill{display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:3px 8px 3px 4px;font-size:.78rem;color:#334155}
         .person-delete{margin-left:auto;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:8px;padding:4px 8px;font-size:.72rem;cursor:pointer}
