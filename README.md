@@ -16,6 +16,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - People with unique colored circular badges and first-letter initials
 - Compact mobile-first actions: `People` and `Add task` buttons open modal forms
 - `Add` / `Create` / `Save` submit buttons stay disabled (grey) until title/name input is filled
+- Modal input focus is preserved during card re-renders (typing no longer drops focus mid-edit)
 - Click any task to edit title/assignees/day/end date in modal
 - Delete task directly from the edit modal
 - Drag people badges directly onto tasks to assign quickly

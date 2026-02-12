@@ -437,6 +437,33 @@ class HouseholdChoresCard extends HTMLElement {
     if (taskSubmit) taskSubmit.disabled = !this._canSubmitTaskForm();
   }
 
+  _captureFocusState() {
+    const active = this.shadowRoot?.activeElement;
+    if (!active || !active.id) return null;
+
+    const state = { id: active.id };
+    if (typeof active.selectionStart === "number" && typeof active.selectionEnd === "number") {
+      state.selectionStart = active.selectionStart;
+      state.selectionEnd = active.selectionEnd;
+    }
+    return state;
+  }
+
+  _restoreFocusState(state) {
+    if (!state?.id || !this.shadowRoot) return;
+    const el = this.shadowRoot.querySelector(`#${state.id}`);
+    if (!el || typeof el.focus !== "function") return;
+
+    el.focus({ preventScroll: true });
+    if (typeof state.selectionStart === "number" && typeof state.selectionEnd === "number" && typeof el.setSelectionRange === "function") {
+      try {
+        el.setSelectionRange(state.selectionStart, state.selectionEnd);
+      } catch (_err) {
+        // Ignore unsupported input types (for example date inputs).
+      }
+    }
+  }
+
   _toggleTaskAssignee(personId) {
     const set = new Set(this._taskForm.assignees);
     if (set.has(personId)) set.delete(personId);
@@ -811,6 +838,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot || !this._config) return;
+    const focusState = this._captureFocusState();
     const loadingHtml = this._loading ? `<div class="loading">Loading board...</div>` : "";
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
 
@@ -1062,6 +1090,8 @@ class HouseholdChoresCard extends HTMLElement {
         await this._saveBoard();
       });
     });
+
+    this._restoreFocusState(focusState);
   }
 }
 
