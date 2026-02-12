@@ -525,9 +525,11 @@ class HouseholdChoresCard extends HTMLElement {
   _renderColumn(column) {
     const tasks = this._tasksForColumn(column.key);
     const isDragOver = this._dragOverColumn === column.key;
+    const isSideLane = column.key === "backlog" || column.key === "done";
+    const laneClass = isSideLane ? "side-lane" : "week-lane";
 
     return `
-      <section class="column ${isDragOver ? "drag-over" : ""}" data-column="${column.key}">
+      <section class="column ${laneClass} ${isDragOver ? "drag-over" : ""}" data-column="${column.key}">
         <header>
           <h3>${column.label}</h3>
           <span>${tasks.length}</span>
@@ -647,6 +649,37 @@ class HouseholdChoresCard extends HTMLElement {
           min-height: 220px;
           display: grid;
           grid-template-rows: auto 1fr;
+        }
+
+        .week-columns .column.week-lane {
+          min-height: 360px;
+          max-height: 360px;
+        }
+
+        .week-columns .column.week-lane .tasks {
+          max-height: 300px;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-right: 2px;
+        }
+
+        .side-columns .column.side-lane {
+          min-height: 170px;
+        }
+
+        .side-columns .column.side-lane .tasks {
+          display: flex;
+          flex-direction: row;
+          align-items: flex-start;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding-bottom: 3px;
+          gap: 6px;
+        }
+
+        .side-columns .column.side-lane .task {
+          min-width: 180px;
+          flex: 0 0 180px;
         }
 
         .column.drag-over {
