@@ -38,6 +38,17 @@ title: Family Week
 entry_id: 0123456789abcdef0123456789abcdef
 ```
 
+## Screenshots
+
+### Tablet overview
+![Tablet weekly board](docs/screenshots/weekly-board-tablet.png)
+
+### Compact/mobile layout
+![Mobile weekly board](docs/screenshots/weekly-board-mobile.png)
+
+### Drag and drop between days
+![Drag and drop state](docs/screenshots/weekly-board-drag-drop.png)
+
 ## Notes
 
 - The custom card JavaScript is auto-registered by the integration at startup.
