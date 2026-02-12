@@ -1,37 +1,45 @@
 # homeassistant-household-chores
 
-Household Chores is a HACS-installable custom integration that creates a weekly household chore calendar and assigns chores to people in the home.
+Household Chores is a HACS-installable custom integration for a weekly household task planner in Home Assistant.
 
-## Features
+## What you get
 
-- Config flow setup in Home Assistant UI
-- Weekly chore assignments with member rotation
-- Calendar entity with generated chore events
-- Sensor for the next upcoming chore
-- Options flow to edit members/chores later
+- Weekly board columns: Monday to Sunday
+- Extra columns: Backlog and Done
+- People with unique colored circular badges and first-letter initials
+- Add people and tasks directly from the card
+- Drag-and-drop tasks between backlog, weekdays, and done
+- Persistent board data stored in Home Assistant (`.storage`)
 
 ## Install (HACS)
 
-1. Push this repository to GitHub.
-2. In Home Assistant, open HACS -> Integrations -> three dots -> Custom repositories.
-3. Add your repository URL and select category `Integration`.
-4. Search for `Household Chores` in HACS and install.
-5. Restart Home Assistant.
-6. Go to Settings -> Devices & Services -> Add Integration -> `Household Chores`.
+1. In Home Assistant, open HACS -> Integrations -> three dots -> Custom repositories.
+2. Add this repository URL and select category `Integration`.
+3. Install `Household Chores`.
+4. Restart Home Assistant.
+5. Go to Settings -> Devices & Services -> Add Integration -> `Household Chores`.
 
-## Configuration
+## Add the card
 
-During setup you can define:
-- Household name
-- Comma-separated list of people (members)
-- Comma-separated list of chores
+1. Open your dashboard and edit it.
+2. Add a Manual card.
+3. Use this config:
 
-The integration will generate weekly chore events and rotate assignments across members.
+```yaml
+type: custom:household-chores-card
+title: Household Chores
+```
+
+If you have multiple `Household Chores` config entries, include `entry_id`:
+
+```yaml
+type: custom:household-chores-card
+title: Family Week
+entry_id: 0123456789abcdef0123456789abcdef
+```
 
 ## Notes
 
-This scaffold is intentionally local-first (no external API). You can extend it later with:
-- per-chore preferred weekday/time
-- completion tracking with persistent storage
-- notifications/reminders
-- dashboard card
+- The custom card JavaScript is auto-registered by the integration at startup.
+- Default chores/members entered during integration setup are used as starter board data.
+- The card layout is optimized for tablet-sized dashboards (including iPad-width screens).

@@ -5,13 +5,13 @@
     "@nikolajflojgaard"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/nikolajflojgaard/homeassistant-household-chores",
+  "documentation": "https://github.com/clawHomeAssistantNiflo/homeassistant-household-chores",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/nikolajflojgaard/homeassistant-household-chores/issues",
+  "issue_tracker": "https://github.com/clawHomeAssistantNiflo/homeassistant-household-chores/issues",
   "loggers": [
     "custom_components.household_chores"
   ],
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
