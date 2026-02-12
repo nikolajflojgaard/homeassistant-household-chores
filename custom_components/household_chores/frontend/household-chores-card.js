@@ -691,6 +691,7 @@ class HouseholdChoresCard extends HTMLElement {
   _renderColumn(column) {
     const tasks = this._tasksForColumn(column.key);
     const isSideLane = column.key === "backlog" || column.key === "done";
+    const isWeekdayLane = this._weekdayKeys().some((item) => item.key === column.key);
     const emptyContent = `
       <div class="empty-wrap ${isSideLane ? "side-empty" : "week-empty"}">
         <div class="empty">Drop here</div>
@@ -703,6 +704,7 @@ class HouseholdChoresCard extends HTMLElement {
         <div class="tasks">
           ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
         </div>
+        ${isWeekdayLane ? `<div class="lane-footer"><button type="button" class="lane-add" data-add-column="${column.key}">Add task</button></div>` : ""}
       </section>
     `;
   }
@@ -816,6 +818,8 @@ class HouseholdChoresCard extends HTMLElement {
         .week-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;min-width:0}
         .side-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .column{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:12px;padding:8px;display:grid;grid-template-rows:auto 1fr;min-height:220px}
+        .lane-footer{margin-top:6px}
+        .lane-add{width:100%;background:#0f766e;color:#fff;border:1px solid transparent;border-radius:9px;padding:7px 10px;font-size:.78rem;cursor:pointer}
         .week-columns .column.week-lane{min-height:360px;max-height:360px}
         .week-columns .column.week-lane .tasks{max-height:300px;overflow-y:auto;overflow-x:hidden;padding-right:2px}
         .side-columns .column.side-lane{min-height:132px;max-height:132px}
