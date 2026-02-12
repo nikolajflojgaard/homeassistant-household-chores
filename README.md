@@ -9,6 +9,9 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Secondary row: Backlog + Done in a 2-column grid below the week
 - People with unique colored circular badges and first-letter initials
 - Compact mobile-first actions: `People` and `Add task` buttons open modal forms
+- Click any task to edit title/assignees/day/end date in modal
+- Delete task directly from the edit modal
+- Drag people badges directly onto tasks to assign quickly
 - Optional fixed recurring tasks with:
   - end date
   - weekday selection (`M T W T F S S`)

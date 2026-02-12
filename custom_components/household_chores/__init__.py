@@ -73,6 +73,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     domain_data.setdefault("logger", _LOGGER)
     domain_data.setdefault("boards", {})
     domain_data.setdefault("entry_unsubs", {})
+    if not domain_data.get("ws_registered"):
+        async_register_ws(hass)
+        domain_data["ws_registered"] = True
+    if not domain_data.get("card_registered"):
+        await async_register_card(hass)
+        domain_data["card_registered"] = True
 
     name = entry.options.get(CONF_NAME, entry.data.get(CONF_NAME, DEFAULT_NAME))
     members = _as_list(entry.options.get(CONF_MEMBERS, entry.data.get(CONF_MEMBERS)), DEFAULT_MEMBERS)
