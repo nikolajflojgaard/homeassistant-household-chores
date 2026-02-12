@@ -66,6 +66,18 @@ class HouseholdChoresCard extends HTMLElement {
     ];
   }
 
+  _weekColumns() {
+    return [
+      { key: "monday", label: "Mon" },
+      { key: "tuesday", label: "Tue" },
+      { key: "wednesday", label: "Wed" },
+      { key: "thursday", label: "Thu" },
+      { key: "friday", label: "Fri" },
+      { key: "saturday", label: "Sat" },
+      { key: "sunday", label: "Sun" },
+    ];
+  }
+
   _weekdayKeys() {
     return [
       { key: "monday", short: "M" },
@@ -622,8 +634,10 @@ class HouseholdChoresCard extends HTMLElement {
         .assignees { display: flex; flex-wrap: wrap; gap: 8px; }
         .assignees label { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; }
 
-        .columns-wrap { overflow-x: auto; padding-bottom: 2px; }
-        .columns { display: grid; grid-template-columns: repeat(9, minmax(170px, 1fr)); gap: 8px; min-width: 980px; }
+        .columns-wrap { display: grid; gap: 10px; }
+        .week-scroll { overflow-x: auto; padding-bottom: 2px; }
+        .week-columns { display: grid; grid-template-columns: repeat(7, minmax(170px, 1fr)); gap: 8px; min-width: 860px; }
+        .side-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
         .column {
           background: var(--hc-card);
@@ -705,7 +719,8 @@ class HouseholdChoresCard extends HTMLElement {
 
         @media (max-width: 900px) {
           .top { grid-template-columns: 1fr; }
-          .columns { min-width: 880px; }
+          .week-columns { min-width: 820px; }
+          .side-columns { grid-template-columns: 1fr; }
         }
       </style>
 
@@ -734,8 +749,14 @@ class HouseholdChoresCard extends HTMLElement {
           </div>
 
           <div class="columns-wrap">
-            <div class="columns">
-              ${this._columns().map((column) => this._renderColumn(column)).join("")}
+            <div class="week-scroll">
+              <div class="week-columns">
+                ${this._weekColumns().map((column) => this._renderColumn(column)).join("")}
+              </div>
+            </div>
+            <div class="side-columns">
+              ${this._renderColumn({ key: "backlog", label: "Backlog" })}
+              ${this._renderColumn({ key: "done", label: "Done" })}
             </div>
           </div>
         </div>
