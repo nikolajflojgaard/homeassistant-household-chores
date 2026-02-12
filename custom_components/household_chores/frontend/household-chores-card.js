@@ -782,7 +782,8 @@ class HouseholdChoresCard extends HTMLElement {
       <style>
         :host{--hc-bg:linear-gradient(145deg,#f8fafc 0%,#eef2ff 100%);--hc-text:#0f172a;--hc-muted:#64748b;--hc-border:#dbe3ef;--hc-card:#fff;--hc-accent:#0f766e;display:block}
         ha-card{background:var(--hc-bg);color:var(--hc-text);border-radius:18px;border:1px solid var(--hc-border);overflow:hidden}
-        .wrap{display:grid;gap:8px;padding:8px 12px 12px}
+        .wrap{display:grid;gap:6px;padding:6px 12px 12px}
+        .board-title{margin:0;padding:2px 0 0;font-size:2rem;line-height:1.1;font-weight:500;color:var(--hc-text)}
         .panel{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:14px;padding:10px}
         .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .action-btn{font:inherit;border-radius:10px;border:1px solid transparent;padding:10px;background:var(--hc-accent);color:#fff;font-weight:700;cursor:pointer}
@@ -856,8 +857,9 @@ class HouseholdChoresCard extends HTMLElement {
         }
       </style>
 
-      <ha-card header="${this._escape(this._config.title)}">
+      <ha-card>
         <div class="wrap">
+          <h2 class="board-title">${this._escape(this._config.title)}</h2>
           ${loadingHtml}
           ${errorHtml}
           <div class="panel">
