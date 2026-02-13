@@ -1,0 +1,64 @@
+save_board:
+  name: Save board
+  description: Save full board payload for an entry.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID for the Household Chores board.
+      required: true
+      selector:
+        text:
+    board:
+      name: Board
+      description: Full board JSON payload.
+      required: true
+      selector:
+        object:
+
+get_person_tasks:
+  name: Get person tasks
+  description: Return one person's task summary for a selected week.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID for the Household Chores board.
+      required: true
+      selector:
+        text:
+    person_id:
+      name: Person ID
+      description: Person ID from the board data.
+      required: true
+      selector:
+        text:
+    week_offset:
+      name: Week offset
+      description: 0 for current week, 1 for next week, up to 3.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3
+          mode: box
+
+get_week_summary:
+  name: Get week summary
+  description: Return per-person weekly task summaries for a selected week.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID for the Household Chores board.
+      required: true
+      selector:
+        text:
+    week_offset:
+      name: Week offset
+      description: 0 for current week, 1 for next week, up to 3.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3
+          mode: box

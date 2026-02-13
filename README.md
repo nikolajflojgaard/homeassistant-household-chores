@@ -78,6 +78,10 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Day/Completed empty states include clearer microcopy (`Tap to add`, swipe/drop hints)
 - First-run onboarding tip banner can be dismissed and is persisted across reloads/devices
 - Persistent board data stored in Home Assistant (`.storage`)
+- Dynamic person sensors are created automatically (`sensor.household_chores_<person>_tasks`) with weekly counters + task attributes
+- Response services for dashboards/automations:
+  - `household_chores.get_person_tasks`
+  - `household_chores.get_week_summary`
 
 ## Install (HACS)
 
@@ -153,3 +157,14 @@ The screenshots below are updated with each UI/layout release.
   - future week tasks are kept
   - expired tasks (`end_date` < today) are removed
   - fixed recurring tasks are rebuilt for current week + up to 3 weeks ahead (until their end date)
+
+## Service response examples
+
+Use Home Assistant service calls with response data enabled:
+
+- `household_chores.get_person_tasks`
+  - input: `entry_id`, `person_id`, optional `week_offset` (`0..3`)
+  - output includes: `remaining`, `today`, `upcoming`, `tasks[]`, `week_number`
+- `household_chores.get_week_summary`
+  - input: `entry_id`, optional `week_offset` (`0..3`)
+  - output includes `people[]` summaries + `totals`

@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_NAME, DOMAIN, SIGNAL_BOARD_UPDATED
 from .coordinator import HouseholdChoresCoordinator
+from .stats import person_week_stats
 
 
 async def async_setup_entry(
@@ -25,11 +26,45 @@ async def async_setup_entry(
     """Set up Household Chores sensors from a config entry."""
     coordinator: HouseholdChoresCoordinator = hass.data[DOMAIN][entry.entry_id]
     board_store = hass.data[DOMAIN]["boards"][entry.entry_id]
-    async_add_entities(
-        [
-            NextChoreSensor(entry, coordinator),
-            BoardStateSensor(entry, board_store),
-        ]
+    entities: list[SensorEntity] = [
+        NextChoreSensor(entry, coordinator),
+        BoardStateSensor(entry, board_store),
+    ]
+
+    board = await board_store.async_load()
+    for person in board.get("people", []):
+        person_id = str(person.get("id") or "").strip()
+        if not person_id:
+            continue
+        entities.append(PersonWeekTasksSensor(entry, board_store, person_id))
+
+    async_add_entities(entities)
+
+    known_ids: set[str] = {
+        entity.person_id
+        for entity in entities
+        if isinstance(entity, PersonWeekTasksSensor)
+    }
+
+    def _handle_board_changed() -> None:
+        current_board = getattr(board_store, "_data", None) or {}
+        people = current_board.get("people", []) if isinstance(current_board, dict) else []
+        missing_ids: list[str] = []
+        for person in people:
+            person_id = str(person.get("id") or "").strip()
+            if not person_id or person_id in known_ids:
+                continue
+            known_ids.add(person_id)
+            missing_ids.append(person_id)
+        if missing_ids:
+            async_add_entities([PersonWeekTasksSensor(entry, board_store, person_id) for person_id in missing_ids])
+
+    entry.async_on_unload(
+        async_dispatcher_connect(
+            hass,
+            f"{SIGNAL_BOARD_UPDATED}_{entry.entry_id}",
+            _handle_board_changed,
+        )
     )
 
 
@@ -123,3 +158,82 @@ class BoardStateSensor(SensorEntity):
                 "updated_at": board.get("updated_at", ""),
             },
         }
+
+
+class PersonWeekTasksSensor(SensorEntity):
+    """Sensor exposing one person's selected-week task summary."""
+
+    _attr_icon = "mdi:account-check"
+    _attr_has_entity_name = False
+
+    def __init__(self, entry: ConfigEntry, board_store: Any, person_id: str) -> None:
+        self._entry = entry
+        self._board_store = board_store
+        self.person_id = str(person_id)
+        self._unsub_dispatcher = None
+        self._stats: dict[str, Any] = {}
+        self._person_name = self.person_id
+        self._person_color = ""
+        self._person_role = "adult"
+        self._refresh_from_board()
+        self._attr_unique_id = f"{entry.entry_id}_person_week_{self.person_id}"
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to board update events."""
+        self._unsub_dispatcher = async_dispatcher_connect(
+            self.hass,
+            f"{SIGNAL_BOARD_UPDATED}_{self._entry.entry_id}",
+            self._handle_board_updated,
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe from events."""
+        if self._unsub_dispatcher:
+            self._unsub_dispatcher()
+            self._unsub_dispatcher = None
+
+    @property
+    def name(self) -> str:
+        """Return full entity name."""
+        return f"Household Chores {self._person_name} tasks"
+
+    @property
+    def available(self) -> bool:
+        """Only available while person exists on board."""
+        board = getattr(self._board_store, "_data", None) or {}
+        people = board.get("people", []) if isinstance(board, dict) else []
+        return any(str(person.get("id", "")) == self.person_id for person in people)
+
+    @property
+    def native_value(self) -> int:
+        """State is the number of remaining tasks this week."""
+        return int(self._stats.get("remaining") or 0)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose detailed summary and task payload."""
+        attrs = dict(self._stats)
+        attrs["entry_id"] = self._entry.entry_id
+        attrs["person_id"] = self.person_id
+        attrs["person_name"] = self._person_name
+        attrs["person_color"] = self._person_color
+        attrs["person_role"] = self._person_role
+        return attrs
+
+    def _handle_board_updated(self) -> None:
+        """Handle board updates from store."""
+        self._refresh_from_board()
+        self.async_write_ha_state()
+
+    def _refresh_from_board(self) -> None:
+        board = getattr(self._board_store, "_data", None) or {}
+        stats = person_week_stats(board, self.person_id, week_offset=0)
+        self._stats = stats
+        people = board.get("people", []) if isinstance(board, dict) else []
+        person = next((item for item in people if str(item.get("id", "")) == self.person_id), None)
+        if isinstance(person, dict):
+            name = str(person.get("name") or "").strip()
+            self._person_name = name or self.person_id
+            self._person_color = str(person.get("color") or "")
+            role_raw = str(person.get("role") or "adult").lower()
+            self._person_role = role_raw if role_raw in {"adult", "child"} else "adult"
