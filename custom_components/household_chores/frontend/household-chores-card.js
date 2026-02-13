@@ -1958,7 +1958,7 @@ class HouseholdChoresCard extends HTMLElement {
     const compactMode = Boolean(this._board?.settings?.compact_mode);
     const weekLaneHeight = compactMode ? 320 : 360;
     const weekTaskAreaHeight = compactMode ? 260 : 300;
-    const sideLaneHeight = compactMode ? 82 : 96;
+    const sideLaneHeight = compactMode ? 128 : 156;
 
     this.shadowRoot.innerHTML = `
       <style>
