@@ -11,7 +11,7 @@ class HouseholdChoresCard extends HTMLElement {
     this._config = null;
     this._loadedOnce = false;
 
-    this._board = { people: [], tasks: [], templates: [] };
+    this._board = { people: [], tasks: [], templates: [], settings: this._defaultSettings() };
     this._loading = true;
     this._saving = false;
     this._error = "";
@@ -20,6 +20,7 @@ class HouseholdChoresCard extends HTMLElement {
     this._newPersonRole = "adult";
     this._showPeopleModal = false;
     this._showTaskModal = false;
+    this._showSettingsModal = false;
     this._draggingTask = false;
     this._weekOffset = 0;
     this._maxWeekOffset = 3;
@@ -28,6 +29,7 @@ class HouseholdChoresCard extends HTMLElement {
     this._taskFormDirty = false;
 
     this._taskForm = this._emptyTaskForm("add");
+    this._settingsForm = this._emptySettingsForm();
   }
 
   static getStubConfig() {
@@ -96,6 +98,71 @@ class HouseholdChoresCard extends HTMLElement {
       column: "backlog",
       weekdays: [],
       assignees: [],
+    };
+  }
+
+  _defaultSettings() {
+    return {
+      title: this._config?.title || "Household Chores",
+      theme: "light",
+      labels: {
+        backlog: "Backlog",
+        done: "Done",
+        monday: "Mon",
+        tuesday: "Tue",
+        wednesday: "Wed",
+        thursday: "Thu",
+        friday: "Fri",
+        saturday: "Sat",
+        sunday: "Sun",
+      },
+      weekly_refresh: { weekday: 6, hour: 0, minute: 30 },
+      done_cleanup: { hour: 3, minute: 0 },
+    };
+  }
+
+  _emptySettingsForm() {
+    const settings = this._board?.settings || this._defaultSettings();
+    return JSON.parse(JSON.stringify(settings));
+  }
+
+  _labelForColumn(columnKey) {
+    return this._board?.settings?.labels?.[columnKey] || this._columns().find((c) => c.key === columnKey)?.label || columnKey;
+  }
+
+  _boardTitle() {
+    return this._board?.settings?.title || this._config?.title || "Household Chores";
+  }
+
+  _themeVars() {
+    const theme = this._board?.settings?.theme || "light";
+    if (theme === "dark") {
+      return {
+        bg: "linear-gradient(145deg,#0f172a 0%,#1e293b 100%)",
+        text: "#e2e8f0",
+        muted: "#94a3b8",
+        border: "#334155",
+        card: "#111827",
+        accent: "#2563eb",
+      };
+    }
+    if (theme === "colorful") {
+      return {
+        bg: "linear-gradient(135deg,#ecfeff 0%,#eef2ff 45%,#fff7ed 100%)",
+        text: "#0f172a",
+        muted: "#64748b",
+        border: "#cbd5e1",
+        card: "#ffffff",
+        accent: "#0ea5e9",
+      };
+    }
+    return {
+      bg: "linear-gradient(145deg,#f8fafc 0%,#eef2ff 100%)",
+      text: "#0f172a",
+      muted: "#64748b",
+      border: "#dbe3ef",
+      card: "#fff",
+      accent: "#2563eb",
     };
   }
 
@@ -204,6 +271,7 @@ class HouseholdChoresCard extends HTMLElement {
     const people = Array.isArray(board.people) ? board.people : [];
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
     const templates = Array.isArray(board.templates) ? board.templates : [];
+    const settings = board && typeof board === "object" && board.settings ? board.settings : {};
     const validColumns = this._columns().map((c) => c.key);
 
     const currentWeekStart = this._weekStartIso(0);
@@ -243,6 +311,22 @@ class HouseholdChoresCard extends HTMLElement {
           created_at: tpl.created_at || new Date().toISOString(),
         }))
         .filter((tpl) => tpl.title),
+      settings: {
+        ...this._defaultSettings(),
+        ...settings,
+        labels: {
+          ...this._defaultSettings().labels,
+          ...(settings.labels || {}),
+        },
+        weekly_refresh: {
+          ...this._defaultSettings().weekly_refresh,
+          ...(settings.weekly_refresh || {}),
+        },
+        done_cleanup: {
+          ...this._defaultSettings().done_cleanup,
+          ...(settings.done_cleanup || {}),
+        },
+      },
     };
   }
 
@@ -495,6 +579,39 @@ class HouseholdChoresCard extends HTMLElement {
     this._taskFormOriginal = null;
     this._taskFormDirty = false;
     this._render();
+  }
+
+  _openSettingsModal() {
+    this._settingsForm = this._emptySettingsForm();
+    this._showSettingsModal = true;
+    this._render();
+  }
+
+  _closeSettingsModal() {
+    this._showSettingsModal = false;
+    this._settingsForm = this._emptySettingsForm();
+    this._render();
+  }
+
+  _onSettingsFieldInput(path, value) {
+    const next = JSON.parse(JSON.stringify(this._settingsForm || this._defaultSettings()));
+    let node = next;
+    for (let i = 0; i < path.length - 1; i += 1) {
+      node[path[i]] = node[path[i]] || {};
+      node = node[path[i]];
+    }
+    node[path[path.length - 1]] = value;
+    this._settingsForm = next;
+  }
+
+  async _onSubmitSettings(ev) {
+    ev.preventDefault();
+    const next = JSON.parse(JSON.stringify(this._settingsForm || this._defaultSettings()));
+    next.theme = ["light", "dark", "colorful"].includes(next.theme) ? next.theme : "light";
+    this._board.settings = next;
+    this._showSettingsModal = false;
+    this._render();
+    await this._saveBoard();
   }
 
   _onPersonNameInput(ev) {
@@ -947,7 +1064,7 @@ class HouseholdChoresCard extends HTMLElement {
     `;
     return `
       <section class="column ${isSideLane ? "side-lane" : "week-lane"}" data-column="${column.key}">
-        <header><h3>${column.label}${weekdayDate ? `<small>${weekdayDate}</small>` : ""}</h3><span>${tasks.length}</span></header>
+        <header><h3>${this._escape(this._labelForColumn(column.key))}${weekdayDate ? `<small>${weekdayDate}</small>` : ""}</h3><span>${tasks.length}</span></header>
         <div class="tasks">
           ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
         </div>
@@ -1008,7 +1125,7 @@ class HouseholdChoresCard extends HTMLElement {
               <input id="task-end-date" type="date" value="${this._escape(form.endDate)}" />
             </div>
             ${this._renderWeekdaySelector(form.weekdays)}
-            ${showWeekdayMode ? "" : `<select id="task-column">${this._columns().map((c) => `<option value="${c.key}" ${form.column === c.key ? "selected" : ""}>${c.label}</option>`).join("")}</select>`}
+            ${showWeekdayMode ? "" : `<select id="task-column">${this._columns().map((c) => `<option value="${c.key}" ${form.column === c.key ? "selected" : ""}>${this._escape(this._labelForColumn(c.key))}</option>`).join("")}</select>`}
             <div class="assignees">
               ${this._board.people
                 .map(
@@ -1051,15 +1168,65 @@ class HouseholdChoresCard extends HTMLElement {
     `;
   }
 
+  _renderSettingsModal() {
+    if (!this._showSettingsModal) return "";
+    const form = this._settingsForm || this._defaultSettings();
+    return `
+      <div class="modal-backdrop" id="settings-backdrop">
+        <div class="modal">
+          <div class="modal-head">
+            <h3>Board settings</h3>
+            <button type="button" class="close-btn" id="close-settings">X</button>
+          </div>
+          <form class="task-form" id="settings-form">
+            <input id="settings-title" type="text" placeholder="Board title" value="${this._escape(form.title || "")}" />
+            <select id="settings-theme">
+              <option value="light" ${form.theme === "light" ? "selected" : ""}>Light</option>
+              <option value="dark" ${form.theme === "dark" ? "selected" : ""}>Dark</option>
+              <option value="colorful" ${form.theme === "colorful" ? "selected" : ""}>Colorful</option>
+            </select>
+            <div class="small">Labels</div>
+            <div class="legend-list">
+              ${this._columns().map((col) => `<label>${this._escape(col.label)}<input data-label-key="${col.key}" type="text" value="${this._escape(form.labels?.[col.key] || this._labelForColumn(col.key))}" /></label>`).join("")}
+            </div>
+            <div class="small">Weekly reset</div>
+            <div class="row">
+              <select id="settings-weekday">
+                <option value="0" ${String(form.weekly_refresh?.weekday) === "0" ? "selected" : ""}>Mon</option>
+                <option value="1" ${String(form.weekly_refresh?.weekday) === "1" ? "selected" : ""}>Tue</option>
+                <option value="2" ${String(form.weekly_refresh?.weekday) === "2" ? "selected" : ""}>Wed</option>
+                <option value="3" ${String(form.weekly_refresh?.weekday) === "3" ? "selected" : ""}>Thu</option>
+                <option value="4" ${String(form.weekly_refresh?.weekday) === "4" ? "selected" : ""}>Fri</option>
+                <option value="5" ${String(form.weekly_refresh?.weekday) === "5" ? "selected" : ""}>Sat</option>
+                <option value="6" ${String(form.weekly_refresh?.weekday) === "6" ? "selected" : ""}>Sun</option>
+              </select>
+              <input id="settings-refresh-hour" type="number" min="0" max="23" value="${this._escape(form.weekly_refresh?.hour ?? 0)}" />
+              <input id="settings-refresh-minute" type="number" min="0" max="59" value="${this._escape(form.weekly_refresh?.minute ?? 30)}" />
+            </div>
+            <div class="small">Done cleanup time</div>
+            <div class="row">
+              <input id="settings-cleanup-hour" type="number" min="0" max="23" value="${this._escape(form.done_cleanup?.hour ?? 3)}" />
+              <input id="settings-cleanup-minute" type="number" min="0" max="59" value="${this._escape(form.done_cleanup?.minute ?? 0)}" />
+            </div>
+            <div class="modal-actions">
+              <button type="submit" id="settings-submit">Save settings</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
   _render() {
     if (!this.shadowRoot || !this._config) return;
     const focusState = this._captureFocusState();
     const loadingHtml = this._loading ? `<div class="loading">Loading board...</div>` : "";
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
+    const theme = this._themeVars();
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host{--hc-bg:linear-gradient(145deg,#f8fafc 0%,#eef2ff 100%);--hc-text:#0f172a;--hc-muted:#64748b;--hc-border:#dbe3ef;--hc-card:#fff;--hc-accent:#0f766e;display:block}
+        :host{--hc-bg:${theme.bg};--hc-text:${theme.text};--hc-muted:${theme.muted};--hc-border:${theme.border};--hc-card:${theme.card};--hc-accent:${theme.accent};display:block}
         ha-card{background:var(--hc-bg);color:var(--hc-text);border-radius:18px;border:1px solid var(--hc-border);overflow:hidden}
         .wrap{display:grid;gap:6px;padding:6px 12px 12px}
         .board-title{margin:0;padding:2px 0 0;font-size:2rem;line-height:1.1;font-weight:500;color:var(--hc-text)}
@@ -1159,7 +1326,7 @@ class HouseholdChoresCard extends HTMLElement {
 
       <ha-card>
         <div class="wrap">
-          <h2 class="board-title">${this._escape(this._config.title)}</h2>
+          <h2 class="board-title">${this._escape(this._boardTitle())}</h2>
           ${loadingHtml}
           ${errorHtml}
           <div class="panel">
@@ -1175,6 +1342,7 @@ class HouseholdChoresCard extends HTMLElement {
                 </div>
               </div>
               <div class="swipe-hint">Swipe left/right to browse weeks (0..+3)</div>
+              <button class="week-nav-btn" type="button" id="open-settings">⚙</button>
             </div>
             <div class="people-strip" id="open-people" role="button" tabindex="0" aria-label="Open people">
               <span class="people-strip-label">People</span>
@@ -1198,24 +1366,37 @@ class HouseholdChoresCard extends HTMLElement {
 
       ${this._renderPeopleModal()}
       ${this._renderTaskModal()}
+      ${this._renderSettingsModal()}
     `;
 
     const openPeopleBtn = this.shadowRoot.querySelector("#open-people");
+    const openSettingsBtn = this.shadowRoot.querySelector("#open-settings");
     const weekPrevBtn = this.shadowRoot.querySelector("#week-prev");
     const weekNextBtn = this.shadowRoot.querySelector("#week-next");
     const closePeopleBtn = this.shadowRoot.querySelector("#close-people");
     const closeTaskBtn = this.shadowRoot.querySelector("#close-task");
     const peopleBackdrop = this.shadowRoot.querySelector("#people-backdrop");
     const taskBackdrop = this.shadowRoot.querySelector("#task-backdrop");
+    const settingsBackdrop = this.shadowRoot.querySelector("#settings-backdrop");
     const personForm = this.shadowRoot.querySelector("#person-form");
     const personInput = this.shadowRoot.querySelector("#person-name");
     const personRoleInput = this.shadowRoot.querySelector("#person-role");
+    const settingsForm = this.shadowRoot.querySelector("#settings-form");
+    const settingsTitle = this.shadowRoot.querySelector("#settings-title");
+    const settingsTheme = this.shadowRoot.querySelector("#settings-theme");
+    const settingsWeekday = this.shadowRoot.querySelector("#settings-weekday");
+    const settingsRefreshHour = this.shadowRoot.querySelector("#settings-refresh-hour");
+    const settingsRefreshMinute = this.shadowRoot.querySelector("#settings-refresh-minute");
+    const settingsCleanupHour = this.shadowRoot.querySelector("#settings-cleanup-hour");
+    const settingsCleanupMinute = this.shadowRoot.querySelector("#settings-cleanup-minute");
+    const settingsLabelInputs = this.shadowRoot.querySelectorAll("[data-label-key]");
     const taskForm = this.shadowRoot.querySelector("#task-form");
     const taskTitleInput = this.shadowRoot.querySelector("#task-title");
     const taskColumnInput = this.shadowRoot.querySelector("#task-column");
     const taskEndDateInput = this.shadowRoot.querySelector("#task-end-date");
     const taskFixedInput = this.shadowRoot.querySelector("#task-fixed");
     const deleteTaskBtn = this.shadowRoot.querySelector("#delete-task");
+    const closeSettingsBtn = this.shadowRoot.querySelector("#close-settings");
     const deletePersonButtons = this.shadowRoot.querySelectorAll("[data-delete-person-id]");
     const personRoleSelects = this.shadowRoot.querySelectorAll("[data-person-role-id]");
 
@@ -1228,16 +1409,30 @@ class HouseholdChoresCard extends HTMLElement {
         }
       });
     }
+    if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => this._openSettingsModal());
     if (weekPrevBtn) weekPrevBtn.addEventListener("click", () => this._shiftWeek(-1));
     if (weekNextBtn) weekNextBtn.addEventListener("click", () => this._shiftWeek(1));
     if (closePeopleBtn) closePeopleBtn.addEventListener("click", () => this._closePeopleModal());
     if (closeTaskBtn) closeTaskBtn.addEventListener("click", () => this._closeTaskModal());
+    if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", () => this._closeSettingsModal());
     if (peopleBackdrop) peopleBackdrop.addEventListener("click", (ev) => { if (ev.target === peopleBackdrop) this._closePeopleModal(); });
     if (taskBackdrop) taskBackdrop.addEventListener("click", (ev) => { if (ev.target === taskBackdrop) this._closeTaskModal(); });
+    if (settingsBackdrop) settingsBackdrop.addEventListener("click", (ev) => { if (ev.target === settingsBackdrop) this._closeSettingsModal(); });
 
     if (personForm) personForm.addEventListener("submit", (ev) => this._onAddPerson(ev));
     if (personInput) personInput.addEventListener("input", (ev) => this._onPersonNameInput(ev));
     if (personRoleInput) personRoleInput.addEventListener("change", (ev) => this._onPersonRoleInput(ev));
+    if (settingsForm) settingsForm.addEventListener("submit", (ev) => this._onSubmitSettings(ev));
+    if (settingsTitle) settingsTitle.addEventListener("input", (ev) => this._onSettingsFieldInput(["title"], ev.target.value));
+    if (settingsTheme) settingsTheme.addEventListener("change", (ev) => this._onSettingsFieldInput(["theme"], ev.target.value));
+    if (settingsWeekday) settingsWeekday.addEventListener("change", (ev) => this._onSettingsFieldInput(["weekly_refresh", "weekday"], Number(ev.target.value)));
+    if (settingsRefreshHour) settingsRefreshHour.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "hour"], Number(ev.target.value)));
+    if (settingsRefreshMinute) settingsRefreshMinute.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "minute"], Number(ev.target.value)));
+    if (settingsCleanupHour) settingsCleanupHour.addEventListener("input", (ev) => this._onSettingsFieldInput(["done_cleanup", "hour"], Number(ev.target.value)));
+    if (settingsCleanupMinute) settingsCleanupMinute.addEventListener("input", (ev) => this._onSettingsFieldInput(["done_cleanup", "minute"], Number(ev.target.value)));
+    settingsLabelInputs.forEach((input) => {
+      input.addEventListener("input", (ev) => this._onSettingsFieldInput(["labels", input.dataset.labelKey], ev.target.value));
+    });
 
     if (taskForm) taskForm.addEventListener("submit", (ev) => this._onSubmitTaskForm(ev));
     if (taskTitleInput) taskTitleInput.addEventListener("input", (ev) => this._onTaskFieldInput("title", ev.target.value));

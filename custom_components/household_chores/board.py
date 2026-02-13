@@ -68,11 +68,27 @@ class Task:
 class HouseholdBoardStore:
     """Persistent board state for one config entry."""
 
-    def __init__(self, hass, entry_id: str, members: list[str], chores: list[str]) -> None:
+    def __init__(
+        self,
+        hass,
+        entry_id: str,
+        members: list[str],
+        chores: list[str],
+        refresh_weekday: int = 6,
+        refresh_hour: int = 0,
+        refresh_minute: int = 30,
+        cleanup_hour: int = 3,
+        cleanup_minute: int = 0,
+    ) -> None:
         self._hass = hass
         self._entry_id = entry_id
         self._members = members
         self._chores = chores
+        self._refresh_weekday = refresh_weekday
+        self._refresh_hour = refresh_hour
+        self._refresh_minute = refresh_minute
+        self._cleanup_hour = cleanup_hour
+        self._cleanup_minute = cleanup_minute
         self._store: Store[dict[str, Any]] = Store(hass, 2, f"{DOMAIN}_board_{entry_id}")
         self._data: dict[str, Any] | None = None
 
@@ -109,6 +125,11 @@ class HouseholdBoardStore:
         board["tasks"] = remaining_tasks
         await self.async_save(board)
         return removed_count
+
+    async def async_settings(self) -> dict[str, Any]:
+        """Return normalized settings payload from board."""
+        board = await self.async_load()
+        return board.get("settings", self._default_settings())
 
     async def async_weekly_refresh(self) -> int:
         """Sunday 00:30 refresh.
@@ -251,13 +272,41 @@ class HouseholdBoardStore:
             "people": [asdict(person) for person in people],
             "tasks": [asdict(task) for task in tasks],
             "templates": [],
+            "settings": self._default_settings(),
             "updated_at": created,
+        }
+
+    def _default_settings(self) -> dict[str, Any]:
+        return {
+            "title": "Household Chores",
+            "theme": "light",
+            "labels": {
+                "backlog": "Backlog",
+                "done": "Done",
+                "monday": "Mon",
+                "tuesday": "Tue",
+                "wednesday": "Wed",
+                "thursday": "Thu",
+                "friday": "Fri",
+                "saturday": "Sat",
+                "sunday": "Sun",
+            },
+            "weekly_refresh": {
+                "weekday": int(self._refresh_weekday),
+                "hour": int(self._refresh_hour),
+                "minute": int(self._refresh_minute),
+            },
+            "done_cleanup": {
+                "hour": int(self._cleanup_hour),
+                "minute": int(self._cleanup_minute),
+            },
         }
 
     def _normalize_board(self, board: dict[str, Any]) -> dict[str, Any]:
         people = board.get("people", []) if isinstance(board, dict) else []
         tasks = board.get("tasks", []) if isinstance(board, dict) else []
         templates = board.get("templates", []) if isinstance(board, dict) else []
+        raw_settings = board.get("settings", {}) if isinstance(board, dict) else {}
 
         normalized_people: list[dict[str, Any]] = []
         known_person_ids: set[str] = set()
@@ -357,10 +406,38 @@ class HouseholdBoardStore:
             for order, item in enumerate(column_items):
                 item["order"] = order
 
+        default_settings = self._default_settings()
+        raw_labels = raw_settings.get("labels", {}) if isinstance(raw_settings, dict) else {}
+        labels = default_settings["labels"] | {
+            key: str(raw_labels.get(key) or default_settings["labels"][key]).strip() or default_settings["labels"][key]
+            for key in default_settings["labels"]
+        }
+
+        weekly_raw = raw_settings.get("weekly_refresh", {}) if isinstance(raw_settings, dict) else {}
+        done_raw = raw_settings.get("done_cleanup", {}) if isinstance(raw_settings, dict) else {}
+
+        settings = {
+            "title": str(raw_settings.get("title") or default_settings["title"]).strip() or default_settings["title"],
+            "theme": str(raw_settings.get("theme") or default_settings["theme"]).lower(),
+            "labels": labels,
+            "weekly_refresh": {
+                "weekday": max(0, min(6, _safe_int(weekly_raw.get("weekday"), default_settings["weekly_refresh"]["weekday"]))),
+                "hour": max(0, min(23, _safe_int(weekly_raw.get("hour"), default_settings["weekly_refresh"]["hour"]))),
+                "minute": max(0, min(59, _safe_int(weekly_raw.get("minute"), default_settings["weekly_refresh"]["minute"]))),
+            },
+            "done_cleanup": {
+                "hour": max(0, min(23, _safe_int(done_raw.get("hour"), default_settings["done_cleanup"]["hour"]))),
+                "minute": max(0, min(59, _safe_int(done_raw.get("minute"), default_settings["done_cleanup"]["minute"]))),
+            },
+        }
+        if settings["theme"] not in {"light", "dark", "colorful"}:
+            settings["theme"] = default_settings["theme"]
+
         return {
             "people": normalized_people,
             "tasks": normalized_tasks,
             "templates": normalized_templates,
+            "settings": settings,
             "updated_at": datetime.now(UTC).isoformat(),
         }
 
@@ -386,3 +463,10 @@ def _week_start_for_day(day_value: date) -> date:
 def _week_number_for_day(day_value: date) -> int:
     """Return ISO week number for a date."""
     return day_value.isocalendar().week
+
+
+def _safe_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default

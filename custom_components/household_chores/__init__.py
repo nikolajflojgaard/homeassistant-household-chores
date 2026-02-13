@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME, EVENT_STATE_CHANGED, STATE_OFF, STATE_ON
+from homeassistant.const import CONF_NAME, EVENT_STATE_CHANGED, STATE_OFF
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
 
@@ -174,7 +174,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DEFAULT_REFRESH_MINUTE,
     )
 
-    board_store = HouseholdBoardStore(hass, entry.entry_id, members, chores)
+    board_store = HouseholdBoardStore(
+        hass,
+        entry.entry_id,
+        members,
+        chores,
+        refresh_weekday=refresh_weekday,
+        refresh_hour=refresh_hour,
+        refresh_minute=refresh_minute,
+        cleanup_hour=3,
+        cleanup_minute=0,
+    )
     await board_store.async_load()
     domain_data["boards"][entry.entry_id] = board_store
 
@@ -189,13 +199,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     domain_data[entry.entry_id] = coordinator
 
-    async def _async_cleanup_done_tasks(_now) -> None:
+    async def _async_cleanup_done_tasks(now) -> None:
+        settings = await board_store.async_settings()
+        cleanup = settings.get("done_cleanup", {})
+        cleanup_hour = _as_int(cleanup.get("hour"), 3)
+        cleanup_minute = _as_int(cleanup.get("minute"), 0)
+        if now.hour != cleanup_hour or now.minute != cleanup_minute:
+            return
         removed = await board_store.async_remove_done_tasks()
         if removed:
             _LOGGER.info("Nightly cleanup removed %s done tasks for entry %s", removed, entry.entry_id)
 
     async def _async_weekly_refresh(now) -> None:
-        if now.weekday() != refresh_weekday:
+        settings = await board_store.async_settings()
+        weekly = settings.get("weekly_refresh", {})
+        refresh_weekday_live = _as_int(weekly.get("weekday"), refresh_weekday)
+        refresh_hour_live = _as_int(weekly.get("hour"), refresh_hour)
+        refresh_minute_live = _as_int(weekly.get("minute"), refresh_minute)
+        if now.weekday() != refresh_weekday_live:
+            return
+        if now.hour != refresh_hour_live or now.minute != refresh_minute_live:
             return
         refreshed = await board_store.async_weekly_refresh()
         _LOGGER.info("Weekly refresh rebuilt %s tasks for entry %s", refreshed, entry.entry_id)
@@ -203,15 +226,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     cleanup_unsub = async_track_time_change(
         hass,
         _async_cleanup_done_tasks,
-        hour=3,
-        minute=0,
         second=0,
     )
     weekly_unsub = async_track_time_change(
         hass,
         _async_weekly_refresh,
-        hour=refresh_hour,
-        minute=refresh_minute,
         second=0,
     )
     domain_data["entry_unsubs"][entry.entry_id] = [cleanup_unsub, weekly_unsub]
