@@ -2323,10 +2323,10 @@ class HouseholdChoresCard extends HTMLElement {
         .role-badge.child{background:#f59e0b;color:#111827}
         .small{font-size:.8rem;color:var(--hc-muted);margin-top:6px}
         .columns-wrap{display:grid;gap:10px}
-        .week-grid-wrap{position:relative}
+        .week-grid-wrap{position:relative;--week-head-offset:52px}
         .week-span-overlay{
           position:absolute;
-          top:0;
+          top:var(--week-head-offset);
           left:0;
           right:0;
           display:grid;
@@ -2599,6 +2599,13 @@ class HouseholdChoresCard extends HTMLElement {
     const settingsQuickTemplateInput = this.shadowRoot.querySelector("#settings-quick-template-input");
     const settingsAddQuickTemplateBtn = this.shadowRoot.querySelector("#settings-add-quick-template");
     const settingsRemoveQuickTemplateBtns = this.shadowRoot.querySelectorAll("[data-remove-quick-template]");
+
+    const weekGridWrap = this.shadowRoot.querySelector(".week-grid-wrap");
+    const firstWeekHead = this.shadowRoot.querySelector(".week-columns .column.week-lane .column-head");
+    if (weekGridWrap && firstWeekHead) {
+      const offset = Math.max(40, Math.round(firstWeekHead.getBoundingClientRect().height) + 4);
+      weekGridWrap.style.setProperty("--week-head-offset", `${offset}px`);
+    }
 
     if (openPeopleBtn) {
       openPeopleBtn.addEventListener("click", () => this._openPeopleModal());
