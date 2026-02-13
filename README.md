@@ -98,7 +98,7 @@ The screenshots below are updated with each UI/layout release.
 - If `entry_id` is missing/invalid and exactly one board-state sensor exists, the card auto-resolves to that entry.
 - Card config editor compatibility is included to reduce `configuration error` issues in some Home Assistant frontend builds.
 - `People` and board data are persisted in Home Assistant storage and shared across clients/devices.
-- Integration now auto-restarts Home Assistant shortly after `Household Chores update` is installed (no manual restart click needed).
+- Integration auto-restarts Home Assistant shortly after `Household Chores update` is installed (matches entity_id and update state transitions robustly).
 - Default chores/members entered during integration setup are used as starter board data.
 - The card layout is optimized for tablet-sized dashboards (including iPad-width screens).
 - Tasks moved to `Done` are automatically deleted nightly at `03:00` (Home Assistant local time).

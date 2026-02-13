@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, EVENT_STATE_CHANGED, SERVICE_RESTART, STATE_OFF, STATE_ON
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.event import async_call_later, async_track_time_change
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_change
 
 from .board import HouseholdBoardStore
 from .const import (
@@ -85,6 +86,8 @@ def _try_register_ws(hass: HomeAssistant, domain_data: dict[str, Any]) -> None:
 def _is_household_update_entity(entity_id: str, state_obj: Any) -> bool:
     if not entity_id.startswith("update."):
         return False
+    if "household_chores" in entity_id or "household-chores" in entity_id:
+        return True
     attrs = getattr(state_obj, "attributes", {}) or {}
     title = str(attrs.get("title", "")).lower()
     friendly_name = str(attrs.get("friendly_name", "")).lower()
@@ -95,36 +98,44 @@ def _ensure_auto_restart_watcher(hass: HomeAssistant, domain_data: dict[str, Any
     if domain_data.get("restart_watcher_unsub"):
         return
 
-    async def _handle_update_install(event) -> None:
+    @callback
+    def _handle_update_install(event) -> None:
         if domain_data.get("restart_pending"):
             return
         entity_id = str(event.data.get("entity_id", ""))
         old_state = event.data.get("old_state")
         new_state = event.data.get("new_state")
-        if old_state is None or new_state is None:
+        if new_state is None:
             return
         if not _is_household_update_entity(entity_id, new_state):
             return
-        if old_state.state != STATE_ON or new_state.state != STATE_OFF:
+        old_value = old_state.state if old_state is not None else None
+        new_value = new_state.state
+        # React when update finishes installing and returns to OFF/Up-to-date.
+        # This covers ON->OFF and unavailable->OFF style transitions.
+        if new_value != STATE_OFF:
+            return
+        if old_value == STATE_OFF:
             return
 
         domain_data["restart_pending"] = True
         _LOGGER.info("Detected Household Chores update installation. Scheduling Home Assistant restart.")
 
-        async def _restart_later(_now) -> None:
+        async def _restart_later() -> None:
+            await asyncio.sleep(8)
             try:
                 await hass.services.async_call(
                     "homeassistant",
                     SERVICE_RESTART,
                     {},
-                    blocking=False,
+                    blocking=True,
                 )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Automatic restart after update failed: %s", err)
             finally:
                 domain_data["restart_pending"] = False
 
-        async_call_later(hass, 8, _restart_later)
+        hass.async_create_task(_restart_later())
 
     domain_data["restart_watcher_unsub"] = hass.bus.async_listen(EVENT_STATE_CHANGED, _handle_update_install)
 
