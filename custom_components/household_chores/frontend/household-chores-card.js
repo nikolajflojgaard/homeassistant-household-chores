@@ -2326,13 +2326,13 @@ class HouseholdChoresCard extends HTMLElement {
         .swipe-hint{font-size:.72rem;color:var(--hc-muted)}
         .header-actions{display:flex;align-items:center;gap:8px}
         #open-settings{width:34px;padding:0;display:inline-flex;align-items:center;justify-content:center}
-        .people-strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;cursor:pointer;background:#f8fafc;min-height:38px}
+        .people-strip{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;cursor:pointer;background:#f8fafc;min-height:38px}
         .people-strip:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
         .people-strip-label{font-size:.76rem;font-weight:700;color:#334155;margin-right:2px}
         .people-strip-empty{font-size:.78rem;color:#64748b}
-        .upcoming-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;min-height:38px}
+        .upcoming-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 10px;min-height:34px;height:34px;overflow:hidden}
         .upcoming-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#64748b}
-        .upcoming-pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ef;border-radius:999px;padding:4px 8px;font-size:.76rem;color:#334155}
+        .upcoming-pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ef;border-radius:999px;padding:3px 8px;font-size:.75rem;color:#334155;max-height:26px}
         .upcoming-pill strong{font-size:.72rem;color:#475569}
         .quick-templates{margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
         .quick-label{font-size:.72rem;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
