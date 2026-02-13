@@ -2,6 +2,8 @@
 
 Household Chores is a HACS-installable custom integration for a weekly household task planner in Home Assistant.
 
+![Household Chores Logo](docs/logo-calendar.png)
+
 ## What you get
 
 - Main week row: Monday to Sunday
