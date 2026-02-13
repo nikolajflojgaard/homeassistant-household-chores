@@ -131,6 +131,7 @@ class HouseholdChoresCard extends HTMLElement {
       },
       weekly_refresh: { weekday: 6, hour: 0, minute: 30 },
       quick_templates: [],
+      gestures: { swipe_complete: true, swipe_delete: false },
     };
   }
 
@@ -392,6 +393,10 @@ class HouseholdChoresCard extends HTMLElement {
         quick_templates: Array.isArray(settings.quick_templates)
           ? [...new Set(settings.quick_templates.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24)
           : [...this._defaultSettings().quick_templates],
+        gestures: {
+          ...this._defaultSettings().gestures,
+          ...(settings.gestures || {}),
+        },
       },
       updated_at: String(board?.updated_at || ""),
     };
@@ -960,6 +965,33 @@ class HouseholdChoresCard extends HTMLElement {
     await this._saveBoard();
   }
 
+  async _quickDeleteTask(taskId) {
+    const task = this._board.tasks.find((item) => item.id === taskId);
+    if (!task || task.virtual) return;
+    const snapshot = this._snapshotBoard();
+    const templateId = task.template_id || "";
+    if (templateId) {
+      const occurrenceDate = this._taskOccurrenceDate(task);
+      this._board.templates = this._board.templates.map((tpl) => {
+        if (tpl.id !== templateId) return tpl;
+        const excluded = new Set(Array.isArray(tpl.excluded_dates) ? tpl.excluded_dates : []);
+        if (occurrenceDate) excluded.add(occurrenceDate);
+        return { ...tpl, excluded_dates: [...excluded].sort() };
+      });
+      this._board.tasks = this._board.tasks.filter((t) => {
+        if (t.template_id !== templateId) return true;
+        if (!occurrenceDate) return false;
+        return this._taskOccurrenceDate(t) !== occurrenceDate;
+      });
+    } else {
+      this._board.tasks = this._board.tasks.filter((t) => t.id !== task.id);
+    }
+    this._reindexAllColumns();
+    this._setUndo("Task deleted", snapshot);
+    this._render();
+    await this._saveBoard();
+  }
+
   async _onSaveTaskTitleAsQuickTemplate() {
     const title = String(this._taskForm?.title || "").trim();
     if (!title) return;
@@ -992,9 +1024,10 @@ class HouseholdChoresCard extends HTMLElement {
     const dy = ev.touches[0].clientY - this._taskSwipe.startY;
     if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
     this._taskSwipe.moved = true;
-    if (Math.abs(dx) > Math.abs(dy) && dx > 0) {
+    if (Math.abs(dx) > Math.abs(dy)) {
       ev.preventDefault();
-      taskEl.style.transform = `translateX(${Math.min(56, dx)}px)`;
+      if (dx > 0) taskEl.style.transform = `translateX(${Math.min(56, dx)}px)`;
+      else taskEl.style.transform = `translateX(${Math.max(-56, dx)}px)`;
       taskEl.style.transition = "transform 80ms linear";
     }
   }
@@ -1010,9 +1043,15 @@ class HouseholdChoresCard extends HTMLElement {
     const endY = ev.changedTouches[0].clientY;
     const dx = endX - swipe.startX;
     const dy = endY - swipe.startY;
-    if (dx > 70 && Math.abs(dx) > Math.abs(dy) && swipe.taskId) {
+    const gestures = this._board?.settings?.gestures || {};
+    const completeEnabled = gestures.swipe_complete !== false;
+    const deleteEnabled = Boolean(gestures.swipe_delete);
+    if (dx > 70 && Math.abs(dx) > Math.abs(dy) && swipe.taskId && completeEnabled) {
       this._suppressTaskClickUntil = Date.now() + 500;
       await this._quickMoveTaskToCompleted(swipe.taskId);
+    } else if (dx < -70 && Math.abs(dx) > Math.abs(dy) && swipe.taskId && deleteEnabled) {
+      this._suppressTaskClickUntil = Date.now() + 500;
+      await this._quickDeleteTask(swipe.taskId);
     }
   }
 
@@ -1024,6 +1063,10 @@ class HouseholdChoresCard extends HTMLElement {
     next.quick_templates = Array.isArray(next.quick_templates)
       ? [...new Set(next.quick_templates.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24)
       : [];
+    next.gestures = {
+      swipe_complete: Boolean(next.gestures?.swipe_complete ?? true),
+      swipe_delete: Boolean(next.gestures?.swipe_delete ?? false),
+    };
     this._board.settings = next;
     this._showSettingsModal = false;
     this._render();
@@ -1817,6 +1860,17 @@ class HouseholdChoresCard extends HTMLElement {
               </div>
             </section>
 
+            <section class="settings-section settings-grid two-col">
+              <label class="settings-switch">
+                <input id="settings-swipe-complete" type="checkbox" ${form.gestures?.swipe_complete !== false ? "checked" : ""} />
+                <span>Swipe right to Completed</span>
+              </label>
+              <label class="settings-switch">
+                <input id="settings-swipe-delete" type="checkbox" ${form.gestures?.swipe_delete ? "checked" : ""} />
+                <span>Swipe left to Delete</span>
+              </label>
+            </section>
+
             <section class="settings-section">
               <h4>Weekly Reset</h4>
               <div class="settings-inline">
@@ -2127,6 +2181,8 @@ class HouseholdChoresCard extends HTMLElement {
     const settingsWeekday = this.shadowRoot.querySelector("#settings-weekday");
     const settingsRefreshHour = this.shadowRoot.querySelector("#settings-refresh-hour");
     const settingsRefreshMinute = this.shadowRoot.querySelector("#settings-refresh-minute");
+    const settingsSwipeComplete = this.shadowRoot.querySelector("#settings-swipe-complete");
+    const settingsSwipeDelete = this.shadowRoot.querySelector("#settings-swipe-delete");
     const settingsExportJson = this.shadowRoot.querySelector("#settings-export-json");
     const settingsImportJson = this.shadowRoot.querySelector("#settings-import-json");
     const copyExportJsonBtn = this.shadowRoot.querySelector("#copy-export-json");
@@ -2211,6 +2267,8 @@ class HouseholdChoresCard extends HTMLElement {
     if (settingsWeekday) settingsWeekday.addEventListener("change", (ev) => this._onSettingsFieldInput(["weekly_refresh", "weekday"], Number(ev.target.value)));
     if (settingsRefreshHour) settingsRefreshHour.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "hour"], Number(ev.target.value)));
     if (settingsRefreshMinute) settingsRefreshMinute.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "minute"], Number(ev.target.value)));
+    if (settingsSwipeComplete) settingsSwipeComplete.addEventListener("change", (ev) => this._onSettingsFieldInput(["gestures", "swipe_complete"], ev.target.checked));
+    if (settingsSwipeDelete) settingsSwipeDelete.addEventListener("change", (ev) => this._onSettingsFieldInput(["gestures", "swipe_delete"], ev.target.checked));
     if (settingsImportJson) settingsImportJson.addEventListener("input", (ev) => this._onImportBoardInput(ev));
     if (settingsQuickTemplateInput) settingsQuickTemplateInput.addEventListener("input", (ev) => this._onQuickTemplateInput(ev.target.value));
     if (settingsAddQuickTemplateBtn) settingsAddQuickTemplateBtn.addEventListener("click", () => this._onAddQuickTemplate());

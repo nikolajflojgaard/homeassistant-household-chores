@@ -24,6 +24,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - compact mode (denser tablet layout)
   - labels for weekdays + completed
   - quick template library (add/remove reusable task titles)
+  - gesture controls (`Swipe right -> Completed`, optional `Swipe left -> Delete`)
   - weekly reset day/time
   - live automation summary (`Weekly reset: <day hh:mm>`, `Completed cleanup: Weekly with board reset`)
   - theme presets (`light`, `dark`, `colorful`)
@@ -52,6 +53,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Modal input focus is preserved during card re-renders (typing no longer drops focus mid-edit)
 - Click any task to edit title/assignees/day/end date in modal
 - Swipe right on a task card to instantly move it to `Completed` (tablet gesture)
+- Optional swipe left delete (disabled by default for safety; can be enabled in settings)
 - Delete task directly from the edit modal
 - Drag people badges directly onto tasks to assign quickly
 - Full person names are shown in the top People row

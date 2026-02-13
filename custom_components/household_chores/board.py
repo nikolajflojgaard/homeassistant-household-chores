@@ -322,6 +322,10 @@ class HouseholdBoardStore:
                 "minute": int(self._refresh_minute),
             },
             "quick_templates": [],
+            "gestures": {
+                "swipe_complete": True,
+                "swipe_delete": False,
+            },
         }
 
     def _normalize_board(self, board: dict[str, Any]) -> dict[str, Any]:
@@ -449,6 +453,9 @@ class HouseholdBoardStore:
         }
 
         weekly_raw = raw_settings.get("weekly_refresh", {}) if isinstance(raw_settings, dict) else {}
+        gestures_raw = raw_settings.get("gestures", {}) if isinstance(raw_settings, dict) else {}
+        if not isinstance(gestures_raw, dict):
+            gestures_raw = {}
 
         settings = {
             "title": str(raw_settings.get("title") or default_settings["title"]).strip() or default_settings["title"],
@@ -465,6 +472,10 @@ class HouseholdBoardStore:
                 for item in raw_settings.get("quick_templates", default_settings["quick_templates"])
                 if str(item).strip()
             ][:24],
+            "gestures": {
+                "swipe_complete": bool(gestures_raw.get("swipe_complete", default_settings["gestures"]["swipe_complete"])),
+                "swipe_delete": bool(gestures_raw.get("swipe_delete", default_settings["gestures"]["swipe_delete"])),
+            },
         }
         if settings["theme"] not in {"light", "dark", "colorful"}:
             settings["theme"] = default_settings["theme"]
