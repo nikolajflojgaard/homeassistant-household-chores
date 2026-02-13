@@ -1316,6 +1316,21 @@ class HouseholdChoresCard extends HTMLElement {
     await this._saveBoard();
   }
 
+  async _deleteTaskFromCard(taskId, templateId = "") {
+    const snapshot = this._snapshotBoard();
+    if (templateId) {
+      this._board.templates = this._board.templates.filter((tpl) => tpl.id !== templateId);
+      this._board.tasks = this._board.tasks.filter((task) => task.template_id !== templateId);
+    } else {
+      this._board.tasks = this._board.tasks.filter((task) => task.id !== taskId);
+    }
+    this._reindexAllColumns();
+    this._logActivity("Task deleted");
+    this._setUndo("Task deleted", snapshot);
+    this._render();
+    await this._saveBoard();
+  }
+
   _assigneeChips(task) {
     const draggable = !task.virtual;
     return task.assignees
@@ -1368,8 +1383,8 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _taskMetaLine(task) {
+    if (task.fixed) return "";
     const bits = [];
-    if (task.fixed) bits.push("fixed");
     if (task.end_date) bits.push(`until ${task.end_date}`);
     return bits.length ? `<div class="task-sub">${this._escape(bits.join(" • "))}</div>` : "";
   }
@@ -1377,10 +1392,13 @@ class HouseholdChoresCard extends HTMLElement {
   _renderTaskCard(task) {
     const draggable = !task.virtual;
     return `
-      <article class="task ${task.virtual ? "virtual-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-template-id="${task.template_id || ""}" data-column="${task.column || ""}" data-virtual="${task.virtual ? "1" : "0"}">
+      <article class="task ${task.virtual ? "virtual-task" : ""} ${task.fixed ? "fixed-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-template-id="${task.template_id || ""}" data-column="${task.column || ""}" data-virtual="${task.virtual ? "1" : "0"}">
         <div class="task-head">
           <div class="task-title">${this._escape(task.title)}</div>
-          ${!task.virtual && task.column !== "done" ? `<button class="task-quick-done" type="button" data-task-done-id="${task.id}" title="Move to Done">Done</button>` : ""}
+          <div class="task-actions">
+            ${!task.virtual && task.column !== "done" ? `<button class="task-quick-done" type="button" data-task-done-id="${task.id}" title="Move to Done">Done</button>` : ""}
+            <button class="task-delete-inline" type="button" data-task-delete-id="${task.id}" data-task-delete-template-id="${task.template_id || ""}" title="Delete task">Del</button>
+          </div>
         </div>
         ${this._taskMetaLine(task)}
         <div class="task-meta">${this._assigneeChips(task)}</div>
@@ -1689,9 +1707,12 @@ class HouseholdChoresCard extends HTMLElement {
         .tasks{display:grid;gap:6px;align-content:start}
         .task{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:7px;cursor:grab;user-select:none}
         .task.virtual-task{cursor:default;opacity:.96}
+        .task.fixed-task{background:#e2e8f0;border-color:#cbd5e1}
         .task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
         .task-title{font-size:.78rem;font-weight:600;line-height:1.25}
+        .task-actions{display:flex;align-items:center;gap:4px}
         .task-quick-done{padding:3px 6px;border-radius:8px;border:1px solid #86efac;background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;cursor:pointer}
+        .task-delete-inline{padding:3px 6px;border-radius:8px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:700;cursor:pointer}
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
         .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
         .empty-wrap{display:grid;gap:6px;align-content:start}
@@ -1991,6 +2012,13 @@ class HouseholdChoresCard extends HTMLElement {
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
         await this._quickMoveTaskToDone(btn.dataset.taskDoneId);
+      });
+    });
+
+    this.shadowRoot.querySelectorAll("[data-task-delete-id]").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        await this._deleteTaskFromCard(btn.dataset.taskDeleteId, btn.dataset.taskDeleteTemplateId || "");
       });
     });
 
