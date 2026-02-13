@@ -115,6 +115,7 @@ class HouseholdChoresCard extends HTMLElement {
     return {
       title: this._config?.title || "Household Chores",
       theme: "light",
+      compact_mode: false,
       labels: {
         backlog: "Backlog",
         done: "Done",
@@ -873,6 +874,7 @@ class HouseholdChoresCard extends HTMLElement {
     ev.preventDefault();
     const next = JSON.parse(JSON.stringify(this._settingsForm || this._defaultSettings()));
     next.theme = ["light", "dark", "colorful"].includes(next.theme) ? next.theme : "light";
+    next.compact_mode = Boolean(next.compact_mode);
     this._board.settings = next;
     this._showSettingsModal = false;
     this._render();
@@ -1496,6 +1498,19 @@ class HouseholdChoresCard extends HTMLElement {
     `;
   }
 
+  _renderActiveFilterChip() {
+    if (this._personFilter === "all") return "";
+    const person = this._board.people.find((p) => String(p.id) === this._personFilter);
+    if (!person) return "";
+    return `
+      <button class="filter-chip" type="button" id="clear-filter" title="Clear filter">
+        <span class="chip" style="background:${person.color}">${this._personInitial(person.name)}</span>
+        <span>${this._escape(person.name)}</span>
+        <span class="clear-mark">x</span>
+      </button>
+    `;
+  }
+
   _renderWeekdaySelector(selected) {
     return `
       <div class="weekday-picks">
@@ -1593,6 +1608,10 @@ class HouseholdChoresCard extends HTMLElement {
                   <option value="colorful" ${form.theme === "colorful" ? "selected" : ""}>Colorful</option>
                 </select>
               </label>
+              <label class="settings-switch">
+                <input id="settings-compact-mode" type="checkbox" ${form.compact_mode ? "checked" : ""} />
+                <span>Compact mode</span>
+              </label>
             </section>
 
             <section class="settings-section">
@@ -1666,6 +1685,10 @@ class HouseholdChoresCard extends HTMLElement {
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
     const undoHtml = this._undoState ? `<div class="undo-bar"><span>${this._escape(this._undoState.label)}</span><button id="undo-action-btn" type="button">Undo</button></div>` : "";
     const theme = this._themeVars();
+    const compactMode = Boolean(this._board?.settings?.compact_mode);
+    const weekLaneHeight = compactMode ? 320 : 360;
+    const weekTaskAreaHeight = compactMode ? 260 : 300;
+    const sideLaneHeight = compactMode ? 82 : 96;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1678,6 +1701,9 @@ class HouseholdChoresCard extends HTMLElement {
         .assignee-filter{display:flex;align-items:center;gap:6px}
         .assignee-filter label{font-size:.74rem;color:#64748b;font-weight:600}
         .assignee-filter select{padding:6px 8px;min-width:120px;height:34px}
+        .filter-chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 10px 0 6px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:.76rem;font-weight:600}
+        .filter-chip .chip{width:18px;height:18px;font-size:.62rem}
+        .filter-chip .clear-mark{font-weight:700;color:#334155}
         .undo-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;padding:8px 10px;border-radius:9px;font-size:.82rem}
         #undo-action-btn{background:#dbeafe;border-color:#93c5fd;color:#1e40af;padding:6px 10px;font-weight:700}
         .week-nav{display:flex;align-items:center;gap:10px}
@@ -1708,9 +1734,9 @@ class HouseholdChoresCard extends HTMLElement {
         .week-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;min-width:0}
         .side-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .column{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:12px;padding:8px;display:grid;grid-template-rows:auto 1fr;min-height:220px}
-        .week-columns .column.week-lane{min-height:360px;max-height:360px}
-        .week-columns .column.week-lane .tasks{max-height:300px;overflow-y:auto;overflow-x:hidden;padding-right:2px}
-        .side-columns .column.side-lane{min-height:96px;max-height:96px}
+        .week-columns .column.week-lane{min-height:${weekLaneHeight}px;max-height:${weekLaneHeight}px}
+        .week-columns .column.week-lane .tasks{max-height:${weekTaskAreaHeight}px;overflow-y:auto;overflow-x:hidden;padding-right:2px}
+        .side-columns .column.side-lane{min-height:${sideLaneHeight}px;max-height:${sideLaneHeight}px}
         .side-columns .column.side-lane .tasks{display:flex;flex-direction:row;align-items:flex-start;overflow-x:auto;overflow-y:hidden;gap:6px;padding-bottom:3px}
         .side-columns .column.side-lane .task{min-width:180px;flex:0 0 180px}
         .column.drag-over{border-color:#2563eb;box-shadow:inset 0 0 0 1px #2563eb;background:#f0f7ff}
@@ -1724,9 +1750,10 @@ class HouseholdChoresCard extends HTMLElement {
         .task.virtual-task{cursor:default;opacity:.96}
         .task.fixed-task{background:#ecf3ff;border-color:#b7cdf3;box-shadow:inset 3px 0 0 #3b82f6}
         .task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
-        .task-title{font-size:.78rem;font-weight:600;line-height:1.25}
+        .task-title{font-size:.78rem;font-weight:600;line-height:1.34}
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
         .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+        .task .chip{width:19px;height:19px;font-size:.66rem}
         .empty-wrap{display:grid;gap:6px;align-content:start}
         .week-empty{grid-template-columns:1fr}
         .side-empty{grid-template-columns:1fr}
@@ -1771,6 +1798,8 @@ class HouseholdChoresCard extends HTMLElement {
         .labels-grid.compact{gap:6px}
         .settings-field{display:grid;gap:4px;font-size:.78rem;color:#475569}
         .settings-field span{font-weight:600}
+        .settings-switch{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#334155;font-weight:600}
+        .settings-switch input{width:16px;height:16px;padding:0}
         .settings-inline{display:flex;align-items:center;gap:8px}
         textarea{font:inherit;border-radius:10px;border:1px solid var(--hc-border);padding:8px 10px;background:#fff;color:var(--hc-text);resize:vertical;min-height:80px}
         #settings-submit{margin-left:auto;background:#2563eb;color:#fff;border-color:#1d4ed8;font-weight:700}
@@ -1822,6 +1851,7 @@ class HouseholdChoresCard extends HTMLElement {
               </div>
               <div class="header-actions">
                 <div class="swipe-hint">Swipe left/right (0..+3)</div>
+                ${this._renderActiveFilterChip()}
                 ${this._renderAssigneeFilter()}
                 <button class="week-nav-btn" type="button" id="open-settings">⚙</button>
               </div>
@@ -1867,6 +1897,7 @@ class HouseholdChoresCard extends HTMLElement {
     const settingsForm = this.shadowRoot.querySelector("#settings-form");
     const settingsTitle = this.shadowRoot.querySelector("#settings-title");
     const settingsTheme = this.shadowRoot.querySelector("#settings-theme");
+    const settingsCompactMode = this.shadowRoot.querySelector("#settings-compact-mode");
     const settingsWeekday = this.shadowRoot.querySelector("#settings-weekday");
     const settingsRefreshHour = this.shadowRoot.querySelector("#settings-refresh-hour");
     const settingsRefreshMinute = this.shadowRoot.querySelector("#settings-refresh-minute");
@@ -1889,6 +1920,7 @@ class HouseholdChoresCard extends HTMLElement {
     const personRoleSelects = this.shadowRoot.querySelectorAll("[data-person-role-id]");
     const personColorSelects = this.shadowRoot.querySelectorAll("[data-person-color-id]");
     const assigneeFilterSelect = this.shadowRoot.querySelector("#assignee-filter-select");
+    const clearFilterBtn = this.shadowRoot.querySelector("#clear-filter");
     const undoActionBtn = this.shadowRoot.querySelector("#undo-action-btn");
 
     if (openPeopleBtn) {
@@ -1903,6 +1935,10 @@ class HouseholdChoresCard extends HTMLElement {
     if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => this._openSettingsModal());
     if (assigneeFilterSelect) assigneeFilterSelect.addEventListener("change", (ev) => {
       this._setPersonFilter(ev.target.value);
+      this._render();
+    });
+    if (clearFilterBtn) clearFilterBtn.addEventListener("click", () => {
+      this._setPersonFilter("all");
       this._render();
     });
     if (undoActionBtn) undoActionBtn.addEventListener("click", async () => this._undoLastAction());
@@ -1922,6 +1958,7 @@ class HouseholdChoresCard extends HTMLElement {
     if (settingsForm) settingsForm.addEventListener("submit", (ev) => this._onSubmitSettings(ev));
     if (settingsTitle) settingsTitle.addEventListener("input", (ev) => this._onSettingsFieldInput(["title"], ev.target.value));
     if (settingsTheme) settingsTheme.addEventListener("change", (ev) => this._onSettingsFieldInput(["theme"], ev.target.value));
+    if (settingsCompactMode) settingsCompactMode.addEventListener("change", (ev) => this._onSettingsFieldInput(["compact_mode"], ev.target.checked));
     if (settingsWeekday) settingsWeekday.addEventListener("change", (ev) => this._onSettingsFieldInput(["weekly_refresh", "weekday"], Number(ev.target.value)));
     if (settingsRefreshHour) settingsRefreshHour.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "hour"], Number(ev.target.value)));
     if (settingsRefreshMinute) settingsRefreshMinute.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "minute"], Number(ev.target.value)));

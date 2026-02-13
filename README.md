@@ -11,6 +11,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Secondary row: Backlog + Done in a 2-column grid below the week
 - On compact/mobile screens, Backlog/Done tasks switch to a responsive card grid (no forced overflow cards)
 - Header is simplified: week navigator + people strip (tap people strip to manage household members)
+- Active person filter is shown as a compact chip near week controls (tap chip to clear quickly)
 - Settings gear in header opens board-level configuration modal
 - Backlog/Done lanes are intentionally shorter (about 2 task rows viewport)
 - Each lane card acts as a hidden quick-add area:
@@ -19,6 +20,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Future week views use the same interaction model as current week (`Drop here`, click whitespace to add)
 - Settings modal includes:
   - board title
+  - compact mode (denser tablet layout)
   - labels for weekdays + backlog + done
   - weekly reset day/time
   - done cleanup time
