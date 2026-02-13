@@ -27,6 +27,7 @@ class HouseholdChoresCard extends HTMLElement {
     this._maxWeekOffset = 3;
     this._swipeStartX = null;
     this._taskSwipe = null;
+    this._blockWeekSwipeUntil = 0;
     this._suppressTaskClickUntil = 0;
     this._taskFormOriginal = null;
     this._taskFormDirty = false;
@@ -355,11 +356,21 @@ class HouseholdChoresCard extends HTMLElement {
 
   _onWeekTouchStart(ev) {
     if (!ev.touches || ev.touches.length !== 1) return;
+    if (Date.now() < this._blockWeekSwipeUntil) return;
+    if (ev.target?.closest?.(".task")) return;
     this._swipeStartX = ev.touches[0].clientX;
   }
 
   _onWeekTouchEnd(ev) {
     if (this._swipeStartX === null || !ev.changedTouches || !ev.changedTouches.length) return;
+    if (Date.now() < this._blockWeekSwipeUntil) {
+      this._swipeStartX = null;
+      return;
+    }
+    if (ev.target?.closest?.(".task")) {
+      this._swipeStartX = null;
+      return;
+    }
     const delta = ev.changedTouches[0].clientX - this._swipeStartX;
     this._swipeStartX = null;
     if (Math.abs(delta) < 40) return;
@@ -1100,6 +1111,7 @@ class HouseholdChoresCard extends HTMLElement {
     if (!ev.touches || ev.touches.length !== 1) return;
     const isVirtual = taskEl.dataset.virtual === "1";
     if (isVirtual) return;
+    this._blockWeekSwipeUntil = Date.now() + 900;
     taskEl.classList.remove("swipe-complete-preview", "swipe-delete-preview");
     this._taskSwipe = {
       taskId: taskEl.dataset.taskId || "",
@@ -1135,6 +1147,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   async _onTaskTouchEnd(taskEl, ev) {
     if (!this._taskSwipe?.active) return;
+    this._blockWeekSwipeUntil = Date.now() + 900;
     const swipe = this._taskSwipe;
     this._taskSwipe = null;
     taskEl.style.transform = "";
