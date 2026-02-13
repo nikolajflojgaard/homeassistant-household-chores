@@ -17,6 +17,7 @@ class HouseholdChoresCard extends HTMLElement {
     this._error = "";
 
     this._newPersonName = "";
+    this._newPersonRole = "adult";
     this._showPeopleModal = false;
     this._showTaskModal = false;
     this._draggingTask = false;
@@ -210,6 +211,7 @@ class HouseholdChoresCard extends HTMLElement {
         id: p.id || `person_${i}`,
         name: (p.name || "Person").trim() || "Person",
         color: p.color || this._autoColor(i),
+        role: p.role === "child" ? "child" : "adult",
       })),
       tasks: tasks
         .map((t, i) => {
@@ -226,6 +228,7 @@ class HouseholdChoresCard extends HTMLElement {
           template_id: t.template_id || "",
           fixed: Boolean(t.fixed),
           week_start: isWeekday ? (t.week_start || currentWeekStart) : "",
+          week_number: Number.isFinite(t.week_number) ? t.week_number : this._weekNumberForOffset(0),
         };
         })
         .filter((t) => t.title),
@@ -413,6 +416,7 @@ class HouseholdChoresCard extends HTMLElement {
         template_id: tpl.id,
         fixed: true,
         week_start: this._weekStartIso(weekOffset),
+        week_number: this._weekNumberForOffset(weekOffset),
         virtual: true,
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
@@ -498,6 +502,10 @@ class HouseholdChoresCard extends HTMLElement {
     this._updateSubmitButtons();
   }
 
+  _onPersonRoleInput(ev) {
+    this._newPersonRole = ev.target.value === "child" ? "child" : "adult";
+  }
+
   async _onAddPerson(ev) {
     ev.preventDefault();
     const name = this._newPersonName.trim();
@@ -507,10 +515,36 @@ class HouseholdChoresCard extends HTMLElement {
     let color = this._autoColor(this._board.people.length);
     for (let i = 0; i < 200 && taken.has(color); i += 1) color = this._autoColor(this._board.people.length + i + 1);
 
-    this._board.people = [...this._board.people, { id: `person_${Math.random().toString(36).slice(2, 10)}`, name, color }];
+    this._board.people = [
+      ...this._board.people,
+      { id: `person_${Math.random().toString(36).slice(2, 10)}`, name, color, role: this._newPersonRole === "child" ? "child" : "adult" },
+    ];
     this._newPersonName = "";
+    this._newPersonRole = "adult";
     this._closePeopleModal();
     await this._saveBoard();
+  }
+
+  async _onChangePersonRole(personId, role) {
+    const nextRole = role === "child" ? "child" : "adult";
+    let changed = false;
+    this._board.people = this._board.people.map((person) => {
+      if (person.id !== personId) return person;
+      if ((person.role || "adult") === nextRole) return person;
+      changed = true;
+      return { ...person, role: nextRole };
+    });
+    if (!changed) return;
+    this._render();
+    await this._saveBoard();
+  }
+
+  _personRoleLabel(role) {
+    return role === "child" ? "C" : "A";
+  }
+
+  _personRoleTitle(role) {
+    return role === "child" ? "Child" : "Adult";
   }
 
   async _onDeletePerson(personId) {
@@ -621,6 +655,7 @@ class HouseholdChoresCard extends HTMLElement {
   _buildFixedInstancesForCurrentWeek(template, title, assignees) {
     const todayIso = this._todayIsoDate();
     const weekStart = this._weekStartIso(0);
+    const weekNumber = this._weekNumberForOffset(0);
     const items = [];
     for (const dayKey of template.weekdays) {
       const dayDate = this._weekdayDateForCurrentWeek(dayKey);
@@ -639,12 +674,20 @@ class HouseholdChoresCard extends HTMLElement {
         template_id: template.id,
         fixed: true,
         week_start: weekStart,
+        week_number: weekNumber,
       });
     }
     return items;
   }
 
-  _buildOneOffWeekdayInstances(title, assignees, weekdays, endDate = "", weekStart = this._weekStartIso(this._weekOffset)) {
+  _buildOneOffWeekdayInstances(
+    title,
+    assignees,
+    weekdays,
+    endDate = "",
+    weekStart = this._weekStartIso(this._weekOffset),
+    weekNumber = this._weekNumberForOffset(this._weekOffset)
+  ) {
     const items = [];
     for (const dayKey of weekdays) {
       items.push({
@@ -658,6 +701,7 @@ class HouseholdChoresCard extends HTMLElement {
         template_id: "",
         fixed: false,
         week_start: weekStart,
+        week_number: weekNumber,
       });
     }
     return items;
@@ -709,6 +753,7 @@ class HouseholdChoresCard extends HTMLElement {
         template_id: "",
         fixed: false,
         week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
+        week_number: this._weekNumberForOffset(this._weekOffset),
       },
       ];
     }
@@ -781,6 +826,7 @@ class HouseholdChoresCard extends HTMLElement {
           template_id: "",
           fixed: false,
           week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
+          week_number: original.week_number || this._weekNumberForOffset(this._weekOffset),
         });
       }
     }
@@ -822,7 +868,10 @@ class HouseholdChoresCard extends HTMLElement {
       .filter(Boolean)
       .map(
         (person) =>
-          `<span class="chip" draggable="${draggable ? "true" : "false"}" data-person-id="${person.id}" ${draggable ? `data-source-task-id="${task.id}"` : ""} style="background:${person.color}" title="${this._escape(person.name)}">${this._personInitial(person.name)}</span>`
+          `<span class="assignee-chip-wrap">
+            <span class="chip" draggable="${draggable ? "true" : "false"}" data-person-id="${person.id}" ${draggable ? `data-source-task-id="${task.id}"` : ""} style="background:${person.color}" title="${this._escape(person.name)}">${this._personInitial(person.name)}</span>
+            <span class="role-badge ${person.role === "child" ? "child" : "adult"}" title="${this._personRoleTitle(person.role)}">${this._personRoleLabel(person.role)}</span>
+          </span>`
       )
       .join("");
   }
@@ -909,8 +958,15 @@ class HouseholdChoresCard extends HTMLElement {
           .map(
             (person) =>
               `<div class="legend-item">
-                <span class="chip" draggable="true" data-person-id="${person.id}" style="background:${person.color}">${this._personInitial(person.name)}</span>
+                <span class="chip-wrap">
+                  <span class="chip" draggable="true" data-person-id="${person.id}" style="background:${person.color}">${this._personInitial(person.name)}</span>
+                  <span class="role-badge ${person.role === "child" ? "child" : "adult"}">${this._personRoleLabel(person.role)}</span>
+                </span>
                 <span class="legend-name">${this._escape(person.name)}</span>
+                <select class="person-role-select" data-person-role-id="${person.id}">
+                  <option value="adult" ${person.role !== "child" ? "selected" : ""}>Adult</option>
+                  <option value="child" ${person.role === "child" ? "selected" : ""}>Child</option>
+                </select>
                 <button type="button" class="person-delete" data-delete-person-id="${person.id}" title="Delete person">Delete</button>
               </div>`
           )
@@ -977,6 +1033,10 @@ class HouseholdChoresCard extends HTMLElement {
           </div>
           <form class="row" id="person-form">
             <input id="person-name" type="text" placeholder="Add person" value="${this._escape(this._newPersonName)}" />
+            <select id="person-role">
+              <option value="adult" ${this._newPersonRole !== "child" ? "selected" : ""}>Adult</option>
+              <option value="child" ${this._newPersonRole === "child" ? "selected" : ""}>Child</option>
+            </select>
             <button id="person-submit" type="submit" ${this._canSubmitPersonForm() ? "" : "disabled"}>Add</button>
           </form>
           <div class="small">Tip: drag a person badge onto any task to assign.</div>
@@ -1011,8 +1071,13 @@ class HouseholdChoresCard extends HTMLElement {
         .people-strip-empty{font-size:.78rem;color:#64748b}
         button:disabled{background:#e2e8f0 !important;color:#64748b !important;border-color:#cbd5e1 !important;cursor:not-allowed;opacity:1}
         .person-pill{display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:3px 8px 3px 4px;font-size:.78rem;color:#334155}
+        .chip-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
         .person-delete{margin-left:auto;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:8px;padding:4px 8px;font-size:.72rem;cursor:pointer}
         .chip{width:22px;height:22px;border-radius:999px;color:#fff;font-weight:700;font-size:.75rem;display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 -1px 0 rgba(0,0,0,.2)}
+        .assignee-chip-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;margin-right:4px}
+        .role-badge{position:absolute;right:-5px;bottom:-5px;width:12px;height:12px;border-radius:999px;border:1px solid #fff;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;line-height:1}
+        .role-badge.adult{background:#1d4ed8;color:#fff}
+        .role-badge.child{background:#f59e0b;color:#111827}
         .small{font-size:.8rem;color:var(--hc-muted);margin-top:6px}
         .columns-wrap{display:grid;gap:10px}
         .week-scroll{overflow-x:hidden}
@@ -1053,6 +1118,7 @@ class HouseholdChoresCard extends HTMLElement {
         .legend-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
         .legend-item{display:flex;align-items:center;gap:6px;background:#f8fafc;border-radius:9px;padding:4px 6px}
         .legend-name{font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .person-role-select{min-width:74px;padding:4px 6px;font-size:.74rem}
         .task-form{margin-top:10px;display:grid;gap:8px}
         .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
         .toggle-row label{display:flex;gap:6px;align-items:center;font-size:.84rem}
@@ -1109,7 +1175,7 @@ class HouseholdChoresCard extends HTMLElement {
                 this._board.people.length
                   ? this._board.people
                       .slice(0, 12)
-                      .map((person) => `<span class="person-pill"><span class="chip" draggable="true" data-person-id="${person.id}" style="background:${person.color}" title="${this._escape(person.name)}">${this._personInitial(person.name)}</span><span>${this._escape(person.name)}</span></span>`)
+                      .map((person) => `<span class="person-pill"><span class="chip-wrap"><span class="chip" draggable="true" data-person-id="${person.id}" style="background:${person.color}" title="${this._escape(person.name)}">${this._personInitial(person.name)}</span><span class="role-badge ${person.role === "child" ? "child" : "adult"}">${this._personRoleLabel(person.role)}</span></span><span>${this._escape(person.name)}</span></span>`)
                       .join("")
                   : `<span class="people-strip-empty">Tap to add people</span>`
               }
@@ -1136,6 +1202,7 @@ class HouseholdChoresCard extends HTMLElement {
     const taskBackdrop = this.shadowRoot.querySelector("#task-backdrop");
     const personForm = this.shadowRoot.querySelector("#person-form");
     const personInput = this.shadowRoot.querySelector("#person-name");
+    const personRoleInput = this.shadowRoot.querySelector("#person-role");
     const taskForm = this.shadowRoot.querySelector("#task-form");
     const taskTitleInput = this.shadowRoot.querySelector("#task-title");
     const taskColumnInput = this.shadowRoot.querySelector("#task-column");
@@ -1143,6 +1210,7 @@ class HouseholdChoresCard extends HTMLElement {
     const taskFixedInput = this.shadowRoot.querySelector("#task-fixed");
     const deleteTaskBtn = this.shadowRoot.querySelector("#delete-task");
     const deletePersonButtons = this.shadowRoot.querySelectorAll("[data-delete-person-id]");
+    const personRoleSelects = this.shadowRoot.querySelectorAll("[data-person-role-id]");
 
     if (openPeopleBtn) {
       openPeopleBtn.addEventListener("click", () => this._openPeopleModal());
@@ -1162,6 +1230,7 @@ class HouseholdChoresCard extends HTMLElement {
 
     if (personForm) personForm.addEventListener("submit", (ev) => this._onAddPerson(ev));
     if (personInput) personInput.addEventListener("input", (ev) => this._onPersonNameInput(ev));
+    if (personRoleInput) personRoleInput.addEventListener("change", (ev) => this._onPersonRoleInput(ev));
 
     if (taskForm) taskForm.addEventListener("submit", (ev) => this._onSubmitTaskForm(ev));
     if (taskTitleInput) taskTitleInput.addEventListener("input", (ev) => this._onTaskFieldInput("title", ev.target.value));
@@ -1177,6 +1246,9 @@ class HouseholdChoresCard extends HTMLElement {
     if (deleteTaskBtn) deleteTaskBtn.addEventListener("click", () => this._onDeleteTask());
     deletePersonButtons.forEach((btn) => {
       btn.addEventListener("click", () => this._onDeletePerson(btn.dataset.deletePersonId));
+    });
+    personRoleSelects.forEach((select) => {
+      select.addEventListener("change", (ev) => this._onChangePersonRole(select.dataset.personRoleId, ev.target.value));
     });
     this.shadowRoot.querySelectorAll(".weekday-dot").forEach((dot) => {
       dot.addEventListener("click", () => this._toggleTaskWeekday(dot.dataset.weekday));
@@ -1281,6 +1353,7 @@ class HouseholdChoresCard extends HTMLElement {
         task.column = columnKey;
         const isWeekday = this._weekdayKeys().some((day) => day.key === columnKey);
         task.week_start = isWeekday ? this._weekStartIso(this._weekOffset) : "";
+        if (isWeekday) task.week_number = this._weekNumberForOffset(this._weekOffset);
         this._reindexAllColumns();
         this._render();
         await this._saveBoard();

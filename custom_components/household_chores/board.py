@@ -45,6 +45,7 @@ class Person:
     id: str
     name: str
     color: str
+    role: str = "adult"
 
 
 @dataclass(slots=True)
@@ -61,6 +62,7 @@ class Task:
     template_id: str | None = None
     fixed: bool = False
     week_start: str | None = None
+    week_number: int | None = None
 
 
 class HouseholdBoardStore:
@@ -141,7 +143,15 @@ class HouseholdBoardStore:
         kept_tasks: list[dict[str, Any]] = []
         for task in board.get("tasks", []):
             column = str(task.get("column") or "backlog")
+            task_week_number_raw = task.get("week_number")
+            task_week_number = int(task_week_number_raw) if isinstance(task_week_number_raw, int) else None
             if column == "done":
+                # Weekly reset clears done tasks that belong to this week (or older).
+                # Future-week done tasks (rare) are preserved.
+                current_week_number = _week_number_for_day(today)
+                if task_week_number is None or task_week_number <= current_week_number:
+                    continue
+                kept_tasks.append(task)
                 continue
 
             end_date = _parse_date(task.get("end_date"))
@@ -162,6 +172,9 @@ class HouseholdBoardStore:
 
             normalized_task = dict(task)
             normalized_task["week_start"] = week_start.isoformat() if week_start else None
+            if task_week_number is None and week_start is not None:
+                task_week_number = _week_number_for_day(week_start)
+            normalized_task["week_number"] = task_week_number
             kept_tasks.append(normalized_task)
 
         refreshed_tasks = kept_tasks + self._build_week_tasks_from_templates(active_templates, current_monday)
@@ -198,12 +211,13 @@ class HouseholdBoardStore:
                                 column=weekday,
                                 order=0,
                                 created_at=datetime.now(UTC).isoformat(),
-                                end_date=end_date.isoformat(),
-                                template_id=template["id"],
-                                fixed=True,
-                                week_start=week_start.isoformat(),
-                            )
+                            end_date=end_date.isoformat(),
+                            template_id=template["id"],
+                            fixed=True,
+                            week_start=week_start.isoformat(),
+                            week_number=_week_number_for_day(week_start),
                         )
+                    )
                     )
 
         return generated
@@ -215,7 +229,8 @@ class HouseholdBoardStore:
         ]
 
         created = datetime.now(UTC).isoformat()
-        current_monday = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date()).isoformat()
+        current_monday_date = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date())
+        current_monday = current_monday_date.isoformat()
         tasks: list[Task] = []
         for index, title in enumerate(self._chores):
             assignees = [people[index % len(people)].id] if people else []
@@ -228,6 +243,7 @@ class HouseholdBoardStore:
                     order=index,
                     created_at=created,
                     week_start=current_monday,
+                    week_number=_week_number_for_day(current_monday_date),
                 )
             )
 
@@ -255,7 +271,9 @@ class HouseholdBoardStore:
             known_person_ids.add(person_id)
             name = str(person.get("name") or "Person").strip() or "Person"
             color = str(person.get("color") or DEFAULT_COLORS[len(normalized_people) % len(DEFAULT_COLORS)])
-            normalized_people.append({"id": person_id, "name": name, "color": color})
+            role_raw = str(person.get("role") or "adult").lower()
+            role = role_raw if role_raw in {"adult", "child"} else "adult"
+            normalized_people.append({"id": person_id, "name": name, "color": color, "role": role})
 
         normalized_templates: list[dict[str, Any]] = []
         for template in templates:
@@ -310,6 +328,10 @@ class HouseholdBoardStore:
             week_start = _parse_date(task.get("week_start"))
             if column in WEEKDAY_INDEX and week_start is None:
                 week_start = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date())
+            week_number_raw = task.get("week_number")
+            week_number = int(week_number_raw) if isinstance(week_number_raw, int) else None
+            if week_number is None and week_start is not None:
+                week_number = _week_number_for_day(week_start)
 
             normalized_tasks.append(
                 {
@@ -323,6 +345,7 @@ class HouseholdBoardStore:
                     "template_id": template_id,
                     "fixed": fixed,
                     "week_start": week_start.isoformat() if week_start else None,
+                    "week_number": week_number,
                 }
             )
 
@@ -358,3 +381,8 @@ def _parse_date(value: Any) -> date | None:
 def _week_start_for_day(day_value: date) -> date:
     """Return Monday date for ISO week containing the given date."""
     return day_value - timedelta(days=day_value.weekday())
+
+
+def _week_number_for_day(day_value: date) -> int:
+    """Return ISO week number for a date."""
+    return day_value.isocalendar().week

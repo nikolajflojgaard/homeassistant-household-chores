@@ -15,6 +15,8 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - tap/click whitespace in `Mon..Sun`, `Backlog`, or `Done` to open Add task prefilled for that lane
   - tap/click on a task still opens edit/delete for that task
 - People with unique colored circular badges and first-letter initials
+- People can be marked as `Adult` or `Child` on create, and edited later in the People modal
+- Assignee chips on tasks show role markers (`A` for Adult, `C` for Child)
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Modal input focus is preserved during card re-renders (typing no longer drops focus mid-edit)
@@ -99,6 +101,7 @@ The screenshots below are updated with each UI/layout release.
 - Tasks moved to `Done` are automatically deleted nightly at `03:00` (Home Assistant local time).
 - Weekly board refresh time is configurable in integration options (`day`, `hour`, `minute`).
 - On weekly refresh:
+  - each task has an internal locked `week_number` + `week_start` (not shown in UI)
   - `Done` tasks are removed by nightly cleanup (`03:00`)
   - only past week weekday tasks are cleared (the week you leave)
   - future week tasks are kept
