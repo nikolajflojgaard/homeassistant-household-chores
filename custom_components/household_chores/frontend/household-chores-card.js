@@ -377,25 +377,20 @@ class HouseholdChoresCard extends HTMLElement {
 
   _tasksForColumn(column) {
     const isWeekdayColumn = this._weekdayKeys().some((day) => day.key === column);
-    if (isWeekdayColumn) {
-      const selectedWeekStart = this._weekStartIso(this._weekOffset);
-      const currentWeekStart = this._weekStartIso(0);
-      const stored = this._board.tasks
-        .filter((t) => t.column === column)
-        .filter((t) => (t.week_start || currentWeekStart) === selectedWeekStart)
-        .sort((a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at));
-
-      if (this._weekOffset > 0) {
-        const projected = this._projectedTasksForFutureWeekday(column, this._weekOffset).filter(
-          (task) => !stored.some((item) => item.template_id && item.template_id === task.template_id)
-        );
-        return [...stored, ...projected];
-      }
-      return stored;
-    }
-    return this._board.tasks
+    const selectedWeekStart = this._weekStartIso(this._weekOffset);
+    const currentWeekStart = this._weekStartIso(0);
+    const stored = this._board.tasks
       .filter((t) => t.column === column)
+      .filter((t) => (t.week_start || currentWeekStart) === selectedWeekStart)
       .sort((a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at));
+
+    if (isWeekdayColumn && this._weekOffset > 0) {
+      const projected = this._projectedTasksForFutureWeekday(column, this._weekOffset).filter(
+        (task) => !stored.some((item) => item.template_id && item.template_id === task.template_id)
+      );
+      return [...stored, ...projected];
+    }
+    return stored;
   }
 
   _projectedTasksForFutureWeekday(weekdayKey, weekOffset) {
@@ -739,7 +734,6 @@ class HouseholdChoresCard extends HTMLElement {
       const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
       this._board.tasks = [...this._board.tasks, ...oneOffInstances];
     } else {
-      const isWeekday = this._weekdayKeys().some((item) => item.key === form.column);
       this._board.tasks = [
         ...this._board.tasks,
         {
@@ -752,7 +746,7 @@ class HouseholdChoresCard extends HTMLElement {
         end_date: form.endDate || "",
         template_id: "",
         fixed: false,
-        week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
+        week_start: this._weekStartIso(this._weekOffset),
         week_number: this._weekNumberForOffset(this._weekOffset),
       },
       ];
@@ -814,7 +808,6 @@ class HouseholdChoresCard extends HTMLElement {
         const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
         this._board.tasks.push(...oneOffInstances);
       } else {
-        const isWeekday = this._weekdayKeys().some((item) => item.key === form.column);
         this._board.tasks.push({
           id: original.id,
           title: form.title.trim(),
@@ -825,7 +818,7 @@ class HouseholdChoresCard extends HTMLElement {
           end_date: form.endDate || "",
           template_id: "",
           fixed: false,
-          week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
+          week_start: this._weekStartIso(this._weekOffset),
           week_number: original.week_number || this._weekNumberForOffset(this._weekOffset),
         });
       }
@@ -862,7 +855,7 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _assigneeChips(task) {
-    const draggable = !this._isReadOnlyWeekView() && !task.virtual;
+    const draggable = !task.virtual;
     return task.assignees
       .map((personId) => this._board.people.find((p) => p.id === personId))
       .filter(Boolean)
@@ -920,7 +913,7 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _renderTaskCard(task) {
-    const draggable = !this._isReadOnlyWeekView() && !task.virtual;
+    const draggable = !task.virtual;
     return `
       <article class="task ${task.virtual ? "virtual-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-virtual="${task.virtual ? "1" : "0"}">
         <div class="task-title">${this._escape(task.title)}</div>
@@ -937,11 +930,11 @@ class HouseholdChoresCard extends HTMLElement {
     const weekdayDate = isWeekday ? this._formatWeekdayDate(column.key) : "";
     const emptyContent = `
       <div class="empty-wrap ${isSideLane ? "side-empty" : "week-empty"}">
-        <div class="empty">${this._isReadOnlyWeekView() && isWeekday ? "No fixed tasks" : "Drop here"}</div>
+        <div class="empty">Drop here</div>
       </div>
     `;
     return `
-      <section class="column ${isSideLane ? "side-lane" : "week-lane"} ${this._isReadOnlyWeekView() && isWeekday ? "week-readonly" : ""}" data-column="${column.key}">
+      <section class="column ${isSideLane ? "side-lane" : "week-lane"}" data-column="${column.key}">
         <header><h3>${column.label}${weekdayDate ? `<small>${weekdayDate}</small>` : ""}</h3><span>${tasks.length}</span></header>
         <div class="tasks">
           ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
@@ -1315,7 +1308,6 @@ class HouseholdChoresCard extends HTMLElement {
       const columnKey = columnEl.dataset.column;
       columnEl.addEventListener("click", (ev) => {
         const isWeekdayColumn = this._weekdayKeys().some((day) => day.key === columnKey);
-        if (this._isReadOnlyWeekView() && isWeekdayColumn) return;
         if (this._draggingTask) return;
         if (ev.target.closest(".task")) return;
         if (ev.target.closest("header")) return;
@@ -1323,7 +1315,6 @@ class HouseholdChoresCard extends HTMLElement {
         this._openAddTaskModalForColumn(columnKey);
       });
       columnEl.addEventListener("dragover", (ev) => {
-        if (this._isReadOnlyWeekView()) return;
         if (ev.dataTransfer.types.includes("text/task")) {
           ev.preventDefault();
           columnEl.classList.add("drag-over");
@@ -1333,7 +1324,6 @@ class HouseholdChoresCard extends HTMLElement {
         columnEl.classList.remove("drag-over");
       });
       columnEl.addEventListener("drop", async (ev) => {
-        if (this._isReadOnlyWeekView()) return;
         columnEl.classList.remove("drag-over");
         const taskId = ev.dataTransfer.getData("text/task");
         const personId = ev.dataTransfer.getData("text/person-assignment");
@@ -1351,9 +1341,8 @@ class HouseholdChoresCard extends HTMLElement {
         const task = this._board.tasks.find((t) => t.id === taskId);
         if (!task) return;
         task.column = columnKey;
-        const isWeekday = this._weekdayKeys().some((day) => day.key === columnKey);
-        task.week_start = isWeekday ? this._weekStartIso(this._weekOffset) : "";
-        if (isWeekday) task.week_number = this._weekNumberForOffset(this._weekOffset);
+        task.week_start = this._weekStartIso(this._weekOffset);
+        task.week_number = this._weekNumberForOffset(this._weekOffset);
         this._reindexAllColumns();
         this._render();
         await this._saveBoard();
