@@ -24,13 +24,14 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - done cleanup time
   - theme presets (`light`, `dark`, `colorful`)
 - Settings modal input focus is preserved while typing (no cursor drop on rerender)
-- Settings UI is redesigned with grouped sections for cleaner tablet/mobile usage
+- Settings UI is redesigned with compact grouped sections and collapsible advanced data tools
 - People with unique colored circular badges and first-letter initials
 - People can be marked as `Adult` or `Child` on create, and edited later in the People modal
 - People color is selectable in the People modal (both on create and for existing people)
 - People modal cards now use a compact 2-column layout on tablet/desktop (single column on mobile)
 - Assignee chips on tasks show role markers (`A` for Adult, `C` for Child)
 - Person filter (`All tasks` or a specific person) in header for quicker focused view
+- Person filter is hardened for mixed/legacy assignee data formats (id/name), so filtering stays reliable
 - Undo bar after delete/move actions (task move, task delete, person delete)
 - Data backup tools in settings: export JSON + import JSON restore
 - Multi-device save conflict hardening (`updated_at` guard + automatic merge-retry on client)
@@ -38,6 +39,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Fixed task cards use a subtle blue visual style for quick recognition
 - Deleting a fixed task defaults to this-week occurrence only; modal checkbox allows deleting full fixed series
 - Backlog/Done lanes default to a compact single-row height on tablet/desktop
+- Weekday card headers are minimalist: `Day + task counter` with date shown on the next line
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Assignee changes in Edit task now correctly enable `Save`

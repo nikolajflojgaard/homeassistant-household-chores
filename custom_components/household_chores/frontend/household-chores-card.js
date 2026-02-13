@@ -271,6 +271,14 @@ class HouseholdChoresCard extends HTMLElement {
     return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "2-digit" }).format(date);
   }
 
+  _formatWeekdayDateCompact(weekdayKey, offset = this._weekOffset) {
+    const date = this._weekdayDateForWeek(weekdayKey, offset);
+    if (!date) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}`;
+  }
+
   _isReadOnlyWeekView() {
     return this._weekOffset !== 0;
   }
@@ -303,12 +311,25 @@ class HouseholdChoresCard extends HTMLElement {
 
     const currentWeekStart = this._weekStartIso(0);
     const normalizedPeople = people.map((p, i) => ({
-        id: p.id || `person_${i}`,
+        id: String(p.id || `person_${i}`),
         name: (p.name || "Person").trim() || "Person",
         color: p.color || this._autoColor(i),
         role: p.role === "child" ? "child" : "adult",
       }));
-    const knownPersonIds = new Set(normalizedPeople.map((p) => p.id));
+    const knownPersonIds = new Set(normalizedPeople.map((p) => String(p.id)));
+    const personIdByName = new Map(normalizedPeople.map((p) => [p.name.trim().toLowerCase(), String(p.id)]));
+    const normalizeAssignees = (items) => {
+      if (!Array.isArray(items)) return [];
+      const mapped = items
+        .map((item) => String(item || "").trim())
+        .map((item) => {
+          if (!item) return "";
+          if (knownPersonIds.has(item)) return item;
+          return personIdByName.get(item.toLowerCase()) || "";
+        })
+        .filter(Boolean);
+      return [...new Set(mapped)];
+    };
 
     return {
       people: normalizedPeople,
@@ -317,14 +338,14 @@ class HouseholdChoresCard extends HTMLElement {
           const column = validColumns.includes(t.column) ? t.column : "backlog";
           const isWeekday = this._weekdayKeys().some((day) => day.key === column);
           return {
-          id: t.id || `task_${i}`,
+          id: String(t.id || `task_${i}`),
           title: (t.title || "").trim(),
-          assignees: Array.isArray(t.assignees) ? t.assignees.filter((id) => knownPersonIds.has(id)) : [],
+          assignees: normalizeAssignees(t.assignees),
           column,
           order: Number.isFinite(t.order) ? t.order : i,
           created_at: t.created_at || new Date().toISOString(),
           end_date: t.end_date || "",
-          template_id: t.template_id || "",
+          template_id: String(t.template_id || ""),
           fixed: Boolean(t.fixed),
           week_start: isWeekday ? (t.week_start || currentWeekStart) : "",
           week_number: Number.isFinite(t.week_number) ? t.week_number : this._weekNumberForOffset(0),
@@ -333,9 +354,9 @@ class HouseholdChoresCard extends HTMLElement {
         .filter((t) => t.title),
       templates: templates
         .map((tpl, i) => ({
-          id: tpl.id || `tpl_${i}`,
+          id: String(tpl.id || `tpl_${i}`),
           title: (tpl.title || "").trim(),
-          assignees: Array.isArray(tpl.assignees) ? tpl.assignees.filter((id) => knownPersonIds.has(id)) : [],
+          assignees: normalizeAssignees(tpl.assignees),
           end_date: tpl.end_date || "",
           weekdays: Array.isArray(tpl.weekdays) ? tpl.weekdays : [],
           excluded_dates: Array.isArray(tpl.excluded_dates) ? tpl.excluded_dates : [],
@@ -462,7 +483,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   _setPersonFilter(filterValue) {
     const value = String(filterValue || "all");
-    if (value !== "all" && !this._board.people.some((p) => p.id === value)) {
+    if (value !== "all" && !this._board.people.some((p) => String(p.id) === value)) {
       this._personFilter = "all";
       return;
     }
@@ -1410,7 +1431,7 @@ class HouseholdChoresCard extends HTMLElement {
     const tasks = this._tasksVisibleByFilter(this._tasksForColumn(column.key));
     const isSideLane = column.key === "backlog" || column.key === "done";
     const isWeekday = this._weekdayKeys().some((day) => day.key === column.key);
-    const weekdayDate = isWeekday ? this._formatWeekdayDate(column.key) : "";
+    const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
     const emptyContent = `
       <div class="empty-wrap ${isSideLane ? "side-empty" : "week-empty"}">
         <div class="empty">Drop here</div>
@@ -1418,7 +1439,13 @@ class HouseholdChoresCard extends HTMLElement {
     `;
     return `
       <section class="column ${isSideLane ? "side-lane" : "week-lane"}" data-column="${column.key}">
-        <header><h3>${this._escape(this._labelForColumn(column.key))}${weekdayDate ? `<small>${weekdayDate}</small>` : ""}</h3><span>${tasks.length}</span></header>
+        <header class="column-head">
+          <div class="column-title-row">
+            <h3>${this._escape(this._labelForColumn(column.key))}</h3>
+            <span class="col-count">${tasks.length}</span>
+          </div>
+          ${weekdayDate ? `<div class="col-date">${this._escape(weekdayDate)}</div>` : ""}
+        </header>
         <div class="tasks">
           ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
         </div>
@@ -1458,12 +1485,12 @@ class HouseholdChoresCard extends HTMLElement {
 
   _renderAssigneeFilter() {
     const options = [
-      `<option value="all" ${this._personFilter === "all" ? "selected" : ""}>All tasks</option>`,
-      ...this._board.people.map((person) => `<option value="${person.id}" ${this._personFilter === person.id ? "selected" : ""}>${this._escape(person.name)}</option>`),
+      `<option value="all" ${this._personFilter === "all" ? "selected" : ""}>All</option>`,
+      ...this._board.people.map((person) => `<option value="${this._escape(String(person.id))}" ${this._personFilter === String(person.id) ? "selected" : ""}>${this._escape(person.name)}</option>`),
     ];
     return `
       <div class="assignee-filter">
-        <label for="assignee-filter-select">Filter</label>
+        <label for="assignee-filter-select">Tasks</label>
         <select id="assignee-filter-select">${options.join("")}</select>
       </div>
     `;
@@ -1549,12 +1576,11 @@ class HouseholdChoresCard extends HTMLElement {
       <div class="modal-backdrop" id="settings-backdrop">
         <div class="modal settings-modal">
           <div class="modal-head">
-            <h3>Board settings</h3>
+            <h3>Board Settings</h3>
             <button type="button" class="close-btn" id="close-settings">X</button>
           </div>
           <form class="task-form settings-form" id="settings-form">
-            <section class="settings-section">
-              <h4>General</h4>
+            <section class="settings-section settings-grid two-col">
               <label class="settings-field">
                 <span>Board title</span>
                 <input id="settings-title" data-focus-key="settings-title" type="text" placeholder="Board title" value="${this._escape(form.title || "")}" />
@@ -1570,57 +1596,60 @@ class HouseholdChoresCard extends HTMLElement {
             </section>
 
             <section class="settings-section">
-              <h4>Lane Labels</h4>
-              <div class="settings-grid labels-grid">
+              <h4>Labels</h4>
+              <div class="settings-grid labels-grid compact">
                 ${this._columns().map((col) => `<label class="settings-field"><span>${this._escape(col.label)}</span><input data-label-key="${col.key}" data-focus-key="label-${col.key}" type="text" value="${this._escape(form.labels?.[col.key] || this._labelForColumn(col.key))}" /></label>`).join("")}
               </div>
             </section>
 
-            <section class="settings-section">
-              <h4>Weekly Reset</h4>
-              <div class="settings-inline">
-                <select id="settings-weekday">
-                <option value="0" ${String(form.weekly_refresh?.weekday) === "0" ? "selected" : ""}>Mon</option>
-                <option value="1" ${String(form.weekly_refresh?.weekday) === "1" ? "selected" : ""}>Tue</option>
-                <option value="2" ${String(form.weekly_refresh?.weekday) === "2" ? "selected" : ""}>Wed</option>
-                <option value="3" ${String(form.weekly_refresh?.weekday) === "3" ? "selected" : ""}>Thu</option>
-                <option value="4" ${String(form.weekly_refresh?.weekday) === "4" ? "selected" : ""}>Fri</option>
-                <option value="5" ${String(form.weekly_refresh?.weekday) === "5" ? "selected" : ""}>Sat</option>
-                <option value="6" ${String(form.weekly_refresh?.weekday) === "6" ? "selected" : ""}>Sun</option>
-                </select>
-                <input id="settings-refresh-hour" data-focus-key="settings-refresh-hour" type="number" min="0" max="23" value="${this._escape(form.weekly_refresh?.hour ?? 0)}" />
-                <span>:</span>
-                <input id="settings-refresh-minute" data-focus-key="settings-refresh-minute" type="number" min="0" max="59" value="${this._escape(form.weekly_refresh?.minute ?? 30)}" />
+            <section class="settings-section settings-grid two-col">
+              <div class="settings-block">
+                <h4>Weekly Reset</h4>
+                <div class="settings-inline">
+                  <select id="settings-weekday">
+                  <option value="0" ${String(form.weekly_refresh?.weekday) === "0" ? "selected" : ""}>Mon</option>
+                  <option value="1" ${String(form.weekly_refresh?.weekday) === "1" ? "selected" : ""}>Tue</option>
+                  <option value="2" ${String(form.weekly_refresh?.weekday) === "2" ? "selected" : ""}>Wed</option>
+                  <option value="3" ${String(form.weekly_refresh?.weekday) === "3" ? "selected" : ""}>Thu</option>
+                  <option value="4" ${String(form.weekly_refresh?.weekday) === "4" ? "selected" : ""}>Fri</option>
+                  <option value="5" ${String(form.weekly_refresh?.weekday) === "5" ? "selected" : ""}>Sat</option>
+                  <option value="6" ${String(form.weekly_refresh?.weekday) === "6" ? "selected" : ""}>Sun</option>
+                  </select>
+                  <input id="settings-refresh-hour" data-focus-key="settings-refresh-hour" type="number" min="0" max="23" value="${this._escape(form.weekly_refresh?.hour ?? 0)}" />
+                  <span>:</span>
+                  <input id="settings-refresh-minute" data-focus-key="settings-refresh-minute" type="number" min="0" max="59" value="${this._escape(form.weekly_refresh?.minute ?? 30)}" />
+                </div>
+              </div>
+              <div class="settings-block">
+                <h4>Done Cleanup</h4>
+                <div class="settings-inline">
+                  <input id="settings-cleanup-hour" data-focus-key="settings-cleanup-hour" type="number" min="0" max="23" value="${this._escape(form.done_cleanup?.hour ?? 3)}" />
+                  <span>:</span>
+                  <input id="settings-cleanup-minute" data-focus-key="settings-cleanup-minute" type="number" min="0" max="59" value="${this._escape(form.done_cleanup?.minute ?? 0)}" />
+                </div>
               </div>
             </section>
 
-            <section class="settings-section">
-              <h4>Done Cleanup</h4>
-              <div class="settings-inline">
-                <input id="settings-cleanup-hour" data-focus-key="settings-cleanup-hour" type="number" min="0" max="23" value="${this._escape(form.done_cleanup?.hour ?? 3)}" />
-                <span>:</span>
-                <input id="settings-cleanup-minute" data-focus-key="settings-cleanup-minute" type="number" min="0" max="59" value="${this._escape(form.done_cleanup?.minute ?? 0)}" />
-              </div>
-            </section>
-
-            <section class="settings-section">
-              <h4>Data Backup</h4>
-              <label class="settings-field">
-                <span>Export JSON</span>
-                <textarea id="settings-export-json" readonly rows="6">${this._escape(this._dataExportText || JSON.stringify(this._board, null, 2))}</textarea>
-              </label>
-              <div class="settings-inline">
-                <button type="button" id="copy-export-json">Copy export</button>
-              </div>
-              <label class="settings-field">
-                <span>Import JSON</span>
-                <textarea id="settings-import-json" rows="6" placeholder="Paste board JSON here">${this._escape(this._dataImportText || "")}</textarea>
-              </label>
-              ${this._dataImportError ? `<div class="error">${this._escape(this._dataImportError)}</div>` : ""}
-              <div class="settings-inline">
-                <button type="button" id="import-board-json" ${this._canImportBoard() ? "" : "disabled"}>Import board</button>
-              </div>
-            </section>
+            <details class="settings-advanced">
+              <summary>Advanced data tools</summary>
+              <section class="settings-section">
+                <label class="settings-field">
+                  <span>Export JSON</span>
+                  <textarea id="settings-export-json" readonly rows="6">${this._escape(this._dataExportText || JSON.stringify(this._board, null, 2))}</textarea>
+                </label>
+                <div class="settings-inline">
+                  <button type="button" id="copy-export-json">Copy export</button>
+                </div>
+                <label class="settings-field">
+                  <span>Import JSON</span>
+                  <textarea id="settings-import-json" rows="6" placeholder="Paste board JSON here">${this._escape(this._dataImportText || "")}</textarea>
+                </label>
+                ${this._dataImportError ? `<div class="error">${this._escape(this._dataImportError)}</div>` : ""}
+                <div class="settings-inline">
+                  <button type="button" id="import-board-json" ${this._canImportBoard() ? "" : "disabled"}>Import board</button>
+                </div>
+              </section>
+            </details>
             <div class="modal-actions">
               <button type="submit" id="settings-submit">Save settings</button>
             </div>
@@ -1642,23 +1671,25 @@ class HouseholdChoresCard extends HTMLElement {
       <style>
         :host{--hc-bg:${theme.bg};--hc-text:${theme.text};--hc-muted:${theme.muted};--hc-border:${theme.border};--hc-card:${theme.card};--hc-accent:${theme.accent};display:block}
         ha-card{background:var(--hc-bg);color:var(--hc-text);border-radius:18px;border:1px solid var(--hc-border);overflow:hidden}
-        .wrap{display:grid;gap:6px;padding:6px 12px 12px}
-        .board-title{margin:0;padding:2px 0 0;font-size:2rem;line-height:1.1;font-weight:500;color:var(--hc-text)}
+        .wrap{display:grid;gap:8px;padding:8px 12px 12px}
+        .board-title{margin:0;padding:0;font-size:1.55rem;line-height:1.1;font-weight:600;letter-spacing:-.01em;color:var(--hc-text)}
         .panel{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:14px;padding:10px}
-        .top-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+        .top-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}
         .assignee-filter{display:flex;align-items:center;gap:6px}
-        .assignee-filter label{font-size:.78rem;color:#475569;font-weight:600}
-        .assignee-filter select{padding:6px 8px;min-width:130px}
+        .assignee-filter label{font-size:.74rem;color:#64748b;font-weight:600}
+        .assignee-filter select{padding:6px 8px;min-width:120px;height:34px}
         .undo-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;padding:8px 10px;border-radius:9px;font-size:.82rem}
         #undo-action-btn{background:#dbeafe;border-color:#93c5fd;color:#1e40af;padding:6px 10px;font-weight:700}
-        .week-nav{display:flex;align-items:center;gap:8px}
-        .week-nav-btn{border:1px solid #94a3b8;background:#fff;color:#1e293b;border-radius:10px;padding:6px 10px;font-weight:700;cursor:pointer}
-        .week-label{font-weight:700;font-size:.92rem}
-        .week-sub{font-size:.78rem;color:var(--hc-muted)}
-        .swipe-hint{font-size:.75rem;color:var(--hc-muted)}
-        .people-strip{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;cursor:pointer;background:#f8fafc}
+        .week-nav{display:flex;align-items:center;gap:10px}
+        .week-nav-btn{border:1px solid #c6d3e8;background:#fff;color:#0f172a;border-radius:10px;padding:6px 10px;font-weight:700;cursor:pointer;height:34px}
+        .week-label{font-weight:700;font-size:.9rem}
+        .week-sub{font-size:.74rem;color:var(--hc-muted)}
+        .swipe-hint{font-size:.72rem;color:var(--hc-muted)}
+        .header-actions{display:flex;align-items:center;gap:8px}
+        #open-settings{width:34px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+        .people-strip{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;cursor:pointer;background:#f8fafc;min-height:38px}
         .people-strip:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
-        .people-strip-label{font-size:.78rem;font-weight:700;color:#334155;margin-right:2px}
+        .people-strip-label{font-size:.76rem;font-weight:700;color:#334155;margin-right:2px}
         .people-strip-empty{font-size:.78rem;color:#64748b}
         button:disabled{background:#e2e8f0 !important;color:#64748b !important;border-color:#cbd5e1 !important;cursor:not-allowed;opacity:1}
         #person-submit,#task-submit{background:#2563eb;color:#fff;border-color:#1d4ed8;font-weight:700}
@@ -1683,10 +1714,11 @@ class HouseholdChoresCard extends HTMLElement {
         .side-columns .column.side-lane .tasks{display:flex;flex-direction:row;align-items:flex-start;overflow-x:auto;overflow-y:hidden;gap:6px;padding-bottom:3px}
         .side-columns .column.side-lane .task{min-width:180px;flex:0 0 180px}
         .column.drag-over{border-color:#2563eb;box-shadow:inset 0 0 0 1px #2563eb;background:#f0f7ff}
-        .column header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-        .column h3{margin:0;font-size:.82rem;display:flex;flex-direction:column;gap:2px}
-        .column h3 small{font-weight:500;color:#64748b;font-size:.68rem}
-        .column header span{font-size:.75rem;color:var(--hc-muted)}
+        .column-head{margin-bottom:8px}
+        .column-title-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+        .column h3{margin:0;font-size:.82rem;font-weight:700}
+        .col-count{font-size:.76rem;color:#64748b;font-weight:600}
+        .col-date{font-size:.68rem;color:#94a3b8;margin-top:2px}
         .tasks{display:grid;gap:6px;align-content:start}
         .task{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:7px;cursor:grab;user-select:none}
         .task.virtual-task{cursor:default;opacity:.96}
@@ -1729,17 +1761,25 @@ class HouseholdChoresCard extends HTMLElement {
         .modal-actions{display:flex;justify-content:space-between;gap:8px}
         .delete-series{display:flex;align-items:center;gap:6px;font-size:.8rem;color:#334155}
         .danger{background:#b91c1c;color:#fff;border-color:transparent}
-        .settings-form{gap:12px}
+        .settings-form{gap:10px}
         .settings-section{border:1px solid #dbe3ef;border-radius:12px;padding:10px;background:#f8fafc}
-        .settings-section h4{margin:0 0 8px;font-size:.86rem;color:#334155}
+        .settings-section h4{margin:0 0 8px;font-size:.82rem;color:#334155;letter-spacing:.02em;text-transform:uppercase}
+        .settings-block{display:grid;gap:8px}
         .settings-grid{display:grid;gap:8px}
-        .labels-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+        .two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .labels-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+        .labels-grid.compact{gap:6px}
         .settings-field{display:grid;gap:4px;font-size:.78rem;color:#475569}
         .settings-field span{font-weight:600}
         .settings-inline{display:flex;align-items:center;gap:8px}
         textarea{font:inherit;border-radius:10px;border:1px solid var(--hc-border);padding:8px 10px;background:#fff;color:var(--hc-text);resize:vertical;min-height:80px}
         #settings-submit{margin-left:auto;background:#2563eb;color:#fff;border-color:#1d4ed8;font-weight:700}
+        .settings-advanced{border:1px dashed #cbd5e1;border-radius:10px;padding:8px;background:#fff}
+        .settings-advanced summary{cursor:pointer;font-size:.8rem;font-weight:600;color:#475569}
+        .settings-advanced[open] summary{margin-bottom:8px}
         @media (max-width:900px){
+          .top-row{grid-template-columns:1fr}
+          .header-actions{justify-content:space-between}
           .side-columns{grid-template-columns:1fr}
           .column h3{font-size:.76rem}
           .task-title{font-size:.73rem}
@@ -1758,6 +1798,7 @@ class HouseholdChoresCard extends HTMLElement {
             flex:none;
           }
           .settings-inline{flex-wrap:wrap}
+          .two-col{grid-template-columns:1fr}
           .labels-grid{grid-template-columns:1fr 1fr}
           .legend-list{grid-template-columns:1fr}
         }
@@ -1771,18 +1812,16 @@ class HouseholdChoresCard extends HTMLElement {
           ${undoHtml}
           <div class="panel">
             <div class="top-row">
-              <div>
-                <div class="week-nav">
-                  <button class="week-nav-btn" type="button" id="week-prev" ${this._weekOffset === 0 ? "disabled" : ""}>◀</button>
-                  <div>
-                    <div class="week-label">Week ${this._weekNumberForOffset()}</div>
-                    <div class="week-sub">${this._weekRangeLabel()}</div>
-                  </div>
-                  <button class="week-nav-btn" type="button" id="week-next" ${this._weekOffset >= this._maxWeekOffset ? "disabled" : ""}>▶</button>
+              <div class="week-nav">
+                <button class="week-nav-btn" type="button" id="week-prev" ${this._weekOffset === 0 ? "disabled" : ""}>◀</button>
+                <div>
+                  <div class="week-label">Week ${this._weekNumberForOffset()}</div>
+                  <div class="week-sub">${this._weekRangeLabel()}</div>
                 </div>
+                <button class="week-nav-btn" type="button" id="week-next" ${this._weekOffset >= this._maxWeekOffset ? "disabled" : ""}>▶</button>
               </div>
-              <div class="swipe-hint">Swipe left/right to browse weeks (0..+3)</div>
-              <div class="row">
+              <div class="header-actions">
+                <div class="swipe-hint">Swipe left/right (0..+3)</div>
                 ${this._renderAssigneeFilter()}
                 <button class="week-nav-btn" type="button" id="open-settings">⚙</button>
               </div>
