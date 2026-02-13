@@ -280,6 +280,18 @@ class HouseholdChoresCard extends HTMLElement {
     return `${day}-${month}`;
   }
 
+  _weekdayNameFromIndex(index) {
+    const names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const safe = Number.isFinite(Number(index)) ? Number(index) : 6;
+    return names[Math.max(0, Math.min(6, safe))];
+  }
+
+  _formatClock(hour, minute) {
+    const h = Math.max(0, Math.min(23, Number.isFinite(Number(hour)) ? Number(hour) : 0));
+    const m = Math.max(0, Math.min(59, Number.isFinite(Number(minute)) ? Number(minute) : 0));
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
   _isReadOnlyWeekView() {
     return this._weekOffset !== 0;
   }
@@ -1649,6 +1661,20 @@ class HouseholdChoresCard extends HTMLElement {
               </div>
             </section>
 
+            <section class="settings-section">
+              <h4>Automation Schedule</h4>
+              <div class="schedule-list">
+                <div class="schedule-row">
+                  <span class="schedule-label">Weekly reset</span>
+                  <span class="schedule-value">${this._escape(this._weekdayNameFromIndex(form.weekly_refresh?.weekday))} ${this._escape(this._formatClock(form.weekly_refresh?.hour, form.weekly_refresh?.minute))}</span>
+                </div>
+                <div class="schedule-row">
+                  <span class="schedule-label">Done cleanup</span>
+                  <span class="schedule-value">Daily ${this._escape(this._formatClock(form.done_cleanup?.hour, form.done_cleanup?.minute))}</span>
+                </div>
+              </div>
+            </section>
+
             <details class="settings-advanced">
               <summary>Advanced data tools</summary>
               <section class="settings-section">
@@ -1812,6 +1838,10 @@ class HouseholdChoresCard extends HTMLElement {
         .settings-switch{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#334155;font-weight:600}
         .settings-switch input{width:16px;height:16px;padding:0}
         .settings-inline{display:flex;align-items:center;gap:8px}
+        .schedule-list{display:grid;gap:6px}
+        .schedule-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #dbe3ef;border-radius:10px;padding:8px 10px}
+        .schedule-label{font-size:.78rem;color:#64748b;font-weight:600}
+        .schedule-value{font-size:.8rem;color:#0f172a;font-weight:700}
         textarea{font:inherit;border-radius:10px;border:1px solid var(--hc-border);padding:8px 10px;background:#fff;color:var(--hc-text);resize:vertical;min-height:80px}
         #settings-submit{margin-left:auto;background:#2563eb;color:#fff;border-color:#1d4ed8;font-weight:700}
         .settings-advanced{border:1px dashed #cbd5e1;border-radius:10px;padding:8px;background:#fff}
