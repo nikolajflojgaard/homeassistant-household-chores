@@ -18,6 +18,7 @@ class HouseholdChoresCard extends HTMLElement {
 
     this._newPersonName = "";
     this._newPersonRole = "adult";
+    this._newPersonColor = "#2563eb";
     this._showPeopleModal = false;
     this._showTaskModal = false;
     this._showSettingsModal = false;
@@ -182,6 +183,23 @@ class HouseholdChoresCard extends HTMLElement {
   _autoColor(index) {
     const hue = (index * 47) % 360;
     return `hsl(${hue} 72% 42%)`;
+  }
+
+  _personColorPresets() {
+    return ["#e11d48", "#2563eb", "#059669", "#d97706", "#9333ea", "#0891b2", "#16a34a", "#f59e0b"];
+  }
+
+  _normalizeHexColor(value, fallback = "#2563eb") {
+    const raw = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : fallback;
+  }
+
+  _suggestPersonColor() {
+    const taken = new Set(this._board.people.map((p) => this._normalizeHexColor(p.color, "")));
+    for (const color of this._personColorPresets()) {
+      if (!taken.has(color)) return color;
+    }
+    return this._personColorPresets()[this._board.people.length % this._personColorPresets().length];
   }
 
   _todayIsoDate() {
@@ -512,6 +530,7 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _openPeopleModal() {
+    this._newPersonColor = this._suggestPersonColor();
     this._showPeopleModal = true;
     this._render();
   }
@@ -623,14 +642,16 @@ class HouseholdChoresCard extends HTMLElement {
     this._newPersonRole = ev.target.value === "child" ? "child" : "adult";
   }
 
+  _onPersonColorInput(ev) {
+    this._newPersonColor = this._normalizeHexColor(ev.target.value, this._suggestPersonColor());
+  }
+
   async _onAddPerson(ev) {
     ev.preventDefault();
     const name = this._newPersonName.trim();
     if (!name) return;
 
-    const taken = new Set(this._board.people.map((p) => p.color));
-    let color = this._autoColor(this._board.people.length);
-    for (let i = 0; i < 200 && taken.has(color); i += 1) color = this._autoColor(this._board.people.length + i + 1);
+    const color = this._normalizeHexColor(this._newPersonColor, this._suggestPersonColor());
 
     this._board.people = [
       ...this._board.people,
@@ -638,6 +659,7 @@ class HouseholdChoresCard extends HTMLElement {
     ];
     this._newPersonName = "";
     this._newPersonRole = "adult";
+    this._newPersonColor = this._suggestPersonColor();
     this._closePeopleModal();
     await this._saveBoard();
   }
@@ -650,6 +672,21 @@ class HouseholdChoresCard extends HTMLElement {
       if ((person.role || "adult") === nextRole) return person;
       changed = true;
       return { ...person, role: nextRole };
+    });
+    if (!changed) return;
+    this._render();
+    await this._saveBoard();
+  }
+
+  async _onChangePersonColor(personId, color) {
+    const nextColor = this._normalizeHexColor(color);
+    let changed = false;
+    this._board.people = this._board.people.map((person) => {
+      if (person.id !== personId) return person;
+      const currentColor = this._normalizeHexColor(person.color, nextColor);
+      if (currentColor === nextColor) return person;
+      changed = true;
+      return { ...person, color: nextColor };
     });
     if (!changed) return;
     this._render();
@@ -1094,6 +1131,7 @@ class HouseholdChoresCard extends HTMLElement {
                   <option value="adult" ${person.role !== "child" ? "selected" : ""}>Adult</option>
                   <option value="child" ${person.role === "child" ? "selected" : ""}>Child</option>
                 </select>
+                <input class="person-color-input" data-person-color-id="${person.id}" type="color" value="${this._normalizeHexColor(person.color, this._suggestPersonColor())}" title="Choose color" />
                 <button type="button" class="person-delete" data-delete-person-id="${person.id}" title="Delete person">Delete</button>
               </div>`
           )
@@ -1164,6 +1202,7 @@ class HouseholdChoresCard extends HTMLElement {
               <option value="adult" ${this._newPersonRole !== "child" ? "selected" : ""}>Adult</option>
               <option value="child" ${this._newPersonRole === "child" ? "selected" : ""}>Child</option>
             </select>
+            <input id="person-color" type="color" value="${this._normalizeHexColor(this._newPersonColor, this._suggestPersonColor())}" title="Choose color" />
             <button id="person-submit" type="submit" ${this._canSubmitPersonForm() ? "" : "disabled"}>Add</button>
           </form>
           <div class="small">Tip: drag a person badge onto any task to assign.</div>
@@ -1319,6 +1358,7 @@ class HouseholdChoresCard extends HTMLElement {
         .legend-item{display:flex;align-items:center;gap:6px;background:#f8fafc;border-radius:9px;padding:4px 6px}
         .legend-name{font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .person-role-select{min-width:74px;padding:4px 6px;font-size:.74rem}
+        .person-color-input{width:38px;height:30px;padding:2px}
         .task-form{margin-top:10px;display:grid;gap:8px}
         .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
         .toggle-row label{display:flex;gap:6px;align-items:center;font-size:.84rem}
@@ -1418,6 +1458,7 @@ class HouseholdChoresCard extends HTMLElement {
     const personForm = this.shadowRoot.querySelector("#person-form");
     const personInput = this.shadowRoot.querySelector("#person-name");
     const personRoleInput = this.shadowRoot.querySelector("#person-role");
+    const personColorInput = this.shadowRoot.querySelector("#person-color");
     const settingsForm = this.shadowRoot.querySelector("#settings-form");
     const settingsTitle = this.shadowRoot.querySelector("#settings-title");
     const settingsTheme = this.shadowRoot.querySelector("#settings-theme");
@@ -1436,6 +1477,7 @@ class HouseholdChoresCard extends HTMLElement {
     const closeSettingsBtn = this.shadowRoot.querySelector("#close-settings");
     const deletePersonButtons = this.shadowRoot.querySelectorAll("[data-delete-person-id]");
     const personRoleSelects = this.shadowRoot.querySelectorAll("[data-person-role-id]");
+    const personColorSelects = this.shadowRoot.querySelectorAll("[data-person-color-id]");
 
     if (openPeopleBtn) {
       openPeopleBtn.addEventListener("click", () => this._openPeopleModal());
@@ -1459,6 +1501,7 @@ class HouseholdChoresCard extends HTMLElement {
     if (personForm) personForm.addEventListener("submit", (ev) => this._onAddPerson(ev));
     if (personInput) personInput.addEventListener("input", (ev) => this._onPersonNameInput(ev));
     if (personRoleInput) personRoleInput.addEventListener("change", (ev) => this._onPersonRoleInput(ev));
+    if (personColorInput) personColorInput.addEventListener("input", (ev) => this._onPersonColorInput(ev));
     if (settingsForm) settingsForm.addEventListener("submit", (ev) => this._onSubmitSettings(ev));
     if (settingsTitle) settingsTitle.addEventListener("input", (ev) => this._onSettingsFieldInput(["title"], ev.target.value));
     if (settingsTheme) settingsTheme.addEventListener("change", (ev) => this._onSettingsFieldInput(["theme"], ev.target.value));
@@ -1488,6 +1531,9 @@ class HouseholdChoresCard extends HTMLElement {
     });
     personRoleSelects.forEach((select) => {
       select.addEventListener("change", (ev) => this._onChangePersonRole(select.dataset.personRoleId, ev.target.value));
+    });
+    personColorSelects.forEach((input) => {
+      input.addEventListener("input", (ev) => this._onChangePersonColor(input.dataset.personColorId, ev.target.value));
     });
     this.shadowRoot.querySelectorAll(".weekday-dot").forEach((dot) => {
       dot.addEventListener("click", () => this._toggleTaskWeekday(dot.dataset.weekday));
