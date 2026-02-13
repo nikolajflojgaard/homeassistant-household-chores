@@ -1836,7 +1836,7 @@ class HouseholdChoresCard extends HTMLElement {
     return this._weekdayKeys().findIndex((day) => day.key === dayKey);
   }
 
-  _renderAllDayLane() {
+  _buildWeekSpanLayout() {
     const weekStart = this._weekStartIso(this._weekOffset);
     const candidates = this._tasksVisibleByFilter(this._board.tasks).filter(
       (task) =>
@@ -1844,7 +1844,7 @@ class HouseholdChoresCard extends HTMLElement {
         this._weekdayKeys().some((day) => day.key === task.column) &&
         String(task.week_start || "") === String(weekStart || "")
     );
-    if (!candidates.length) return "";
+    if (!candidates.length) return { bars: [], dayRows: {}, rowCount: 0 };
 
     const groups = new Map();
     for (const task of candidates) {
@@ -1854,7 +1854,7 @@ class HouseholdChoresCard extends HTMLElement {
       groups.set(key, list);
     }
 
-    const bars = [...groups.values()]
+    const preliminaryBars = [...groups.values()]
       .map((items) => {
         const sorted = [...items].sort((a, b) => {
           const aIndex = this._weekdayIndex(a.column);
@@ -1871,21 +1871,45 @@ class HouseholdChoresCard extends HTMLElement {
           taskId: lead.id,
           title: lead.title,
           assignees: lead.assignees || [],
-          columnStart: start + 1,
-          columnEnd: end + 2,
+          start,
+          end,
         };
       })
       .filter(Boolean);
 
-    if (!bars.length) return "";
+    if (!preliminaryBars.length) return { bars: [], dayRows: {}, rowCount: 0 };
+    preliminaryBars.sort((a, b) => (a.start - b.start) || (a.end - b.end));
+
+    const rowEndByIndex = [];
+    const dayRows = {};
+    const bars = preliminaryBars.map((bar) => {
+      let row = rowEndByIndex.findIndex((end) => bar.start > end);
+      if (row === -1) row = rowEndByIndex.length;
+      rowEndByIndex[row] = bar.end;
+      for (let idx = bar.start; idx <= bar.end; idx += 1) {
+        const dayKey = this._weekdayKeys()[idx]?.key;
+        if (!dayKey) continue;
+        dayRows[dayKey] = Math.max(dayRows[dayKey] || 0, row + 1);
+      }
+      return {
+        ...bar,
+        row,
+        columnStart: bar.start + 1,
+        columnEnd: bar.end + 2,
+      };
+    });
+    return { bars, dayRows, rowCount: rowEndByIndex.length };
+  }
+
+  _renderWeekSpanOverlay() {
+    const layout = this._spanLayoutCache || { bars: [], rowCount: 0 };
+    if (!layout.bars.length) return "";
     return `
-      <section class="all-day-lane">
-        <header class="all-day-head">All-day</header>
-        <div class="all-day-grid">
-          ${bars
+      <div class="week-span-overlay" style="--span-rows:${layout.rowCount};">
+          ${layout.bars
             .map(
               (bar) => `
-                <article class="task all-day-bar span-task span-start span-end" draggable="false" data-task-id="${bar.taskId}" data-template-id="" data-column="" data-virtual="0" style="grid-column:${bar.columnStart} / ${bar.columnEnd};">
+                <article class="task week-span-bar span-task span-start span-end" draggable="false" data-task-id="${bar.taskId}" data-template-id="" data-column="" data-virtual="0" style="grid-column:${bar.columnStart} / ${bar.columnEnd};grid-row:${bar.row + 1};">
                   <div class="task-head">
                     <div class="task-title">${this._escape(bar.title)}</div>
                   </div>
@@ -1905,8 +1929,7 @@ class HouseholdChoresCard extends HTMLElement {
               `
             )
             .join("")}
-        </div>
-      </section>
+      </div>
     `;
   }
 
@@ -1917,6 +1940,8 @@ class HouseholdChoresCard extends HTMLElement {
     const isWeekday = this._weekdayKeys().some((day) => day.key === column.key);
     const isTodayColumn = isWeekday && this._weekOffset === 0 && column.key === this._todayWeekdayKey();
     const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
+    const daySpanRows = isWeekday ? (this._spanLayoutCache?.dayRows?.[column.key] || 0) : 0;
+    const daySpanPad = daySpanRows > 0 ? `<div class="span-day-pad" style="height:${daySpanRows * 34}px"></div>` : "";
     const emptyTitle = isWeekday ? "Tap to add" : "Drop completed";
     const emptySub = isWeekday ? "Drop here or swipe tasks" : "Tap to add or drop task";
     const emptyContent = `
@@ -1934,6 +1959,7 @@ class HouseholdChoresCard extends HTMLElement {
           ${weekdayDate ? `<div class="col-date">${this._escape(weekdayDate)}</div>` : ""}
         </header>
         <div class="tasks">
+          ${daySpanPad}
           ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
         </div>
       </section>
@@ -2247,6 +2273,7 @@ class HouseholdChoresCard extends HTMLElement {
     const weekLaneHeight = compactMode ? 320 : 360;
     const weekTaskAreaHeight = compactMode ? 260 : 300;
     const sideLaneHeight = compactMode ? 128 : 156;
+    this._spanLayoutCache = this._buildWeekSpanLayout();
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -2296,10 +2323,21 @@ class HouseholdChoresCard extends HTMLElement {
         .role-badge.child{background:#f59e0b;color:#111827}
         .small{font-size:.8rem;color:var(--hc-muted);margin-top:6px}
         .columns-wrap{display:grid;gap:10px}
-        .all-day-lane{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:12px;padding:8px}
-        .all-day-head{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
-        .all-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:start}
-        .all-day-grid .all-day-bar{min-height:28px}
+        .week-grid-wrap{position:relative}
+        .week-span-overlay{
+          position:absolute;
+          top:0;
+          left:0;
+          right:0;
+          display:grid;
+          grid-template-columns:repeat(7,minmax(0,1fr));
+          gap:8px;
+          align-items:start;
+          pointer-events:none;
+          z-index:2;
+          min-height:calc(var(--span-rows, 0) * 34px);
+        }
+        .week-span-bar{pointer-events:auto}
         .week-scroll{overflow-x:hidden}
         .week-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;min-width:0}
         .side-columns{display:grid;grid-template-columns:1fr;gap:8px}
@@ -2364,6 +2402,7 @@ class HouseholdChoresCard extends HTMLElement {
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
         .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
         .task .chip{width:19px;height:19px;font-size:.66rem}
+        .span-day-pad{width:100%}
         .empty-wrap{display:grid;gap:6px;align-content:start}
         .week-empty{grid-template-columns:1fr}
         .side-empty{grid-template-columns:1fr}
@@ -2430,7 +2469,7 @@ class HouseholdChoresCard extends HTMLElement {
           .header-actions{justify-content:space-between}
           .assignee-filter{flex-wrap:wrap}
           .side-columns{grid-template-columns:1fr}
-          .all-day-grid{grid-template-columns:repeat(7,minmax(110px,1fr));min-width:770px}
+          .week-span-overlay{grid-template-columns:repeat(7,minmax(110px,1fr));min-width:770px}
           .column h3{font-size:.76rem}
           .task-title{font-size:.73rem}
           .side-columns .column.side-lane{min-height:110px;max-height:110px}
@@ -2494,8 +2533,12 @@ class HouseholdChoresCard extends HTMLElement {
           </div>
 
           <div class="columns-wrap">
-            ${this._renderAllDayLane()}
-            <div class="week-scroll"><div class="week-columns">${this._weekColumns().map((col) => this._renderColumn(col)).join("")}</div></div>
+            <div class="week-scroll">
+              <div class="week-grid-wrap">
+                ${this._renderWeekSpanOverlay()}
+                <div class="week-columns">${this._weekColumns().map((col) => this._renderColumn(col)).join("")}</div>
+              </div>
+            </div>
             <div class="side-columns">${this._renderColumn({ key: "done", label: "Completed" })}</div>
           </div>
         </div>
