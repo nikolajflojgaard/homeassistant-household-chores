@@ -36,6 +36,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Activity panel with latest board actions (create/update/delete/move/person changes)
 - Data backup tools in settings: export JSON + import JSON restore
 - Multi-device save conflict hardening (`updated_at` guard + automatic merge-retry on client)
+- Fixed recurring tasks shown in future weeks are now editable/deletable via template modal
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Assignee changes in Edit task now correctly enable `Save`

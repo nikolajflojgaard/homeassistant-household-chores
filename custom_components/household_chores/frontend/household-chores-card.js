@@ -771,6 +771,33 @@ class HouseholdChoresCard extends HTMLElement {
     this._render();
   }
 
+  _openEditTemplateModal(templateId, fallbackColumn = "backlog") {
+    const tpl = this._board.templates.find((item) => item.id === templateId);
+    if (!tpl) return;
+    const knownPersonIds = new Set(this._board.people.map((person) => person.id));
+    const assignees = Array.isArray(tpl.assignees) ? tpl.assignees.filter((id) => knownPersonIds.has(id)) : [];
+    if (Array.isArray(tpl.assignees) && tpl.assignees.length !== assignees.length) {
+      tpl.assignees = [...assignees];
+    }
+
+    this._taskForm = {
+      mode: "edit",
+      taskId: "",
+      templateId: tpl.id,
+      title: tpl.title || "",
+      fixed: true,
+      endDate: tpl.end_date || "",
+      column: fallbackColumn || "backlog",
+      weekdays: Array.isArray(tpl.weekdays) ? [...tpl.weekdays] : [],
+      assignees,
+    };
+
+    this._taskFormOriginal = this._cloneTaskForm(this._taskForm);
+    this._taskFormDirty = false;
+    this._showTaskModal = true;
+    this._render();
+  }
+
   _closeTaskModal() {
     this._showTaskModal = false;
     this._taskForm = this._emptyTaskForm("add");
@@ -1172,8 +1199,12 @@ class HouseholdChoresCard extends HTMLElement {
   async _updateTaskFromForm() {
     const form = this._taskForm;
     const original = this._board.tasks.find((t) => t.id === form.taskId);
-    if (!original) return;
+    const templateRef = form.templateId ? this._board.templates.find((tpl) => tpl.id === form.templateId) : null;
+    if (!original && !templateRef) return;
     const effectiveFixed = form.fixed;
+    const baseTemplateId = original?.template_id || templateRef?.id || "";
+    const originalCreatedAt = original?.created_at || templateRef?.created_at || new Date().toISOString();
+    const originalWeekNumber = original?.week_number || this._weekNumberForOffset(this._weekOffset);
 
     if (effectiveFixed) {
       if (!form.endDate || !form.weekdays.length) {
@@ -1182,18 +1213,18 @@ class HouseholdChoresCard extends HTMLElement {
         return;
       }
 
-      const templateId = form.templateId || `tpl_${Math.random().toString(36).slice(2, 10)}`;
+      const templateId = baseTemplateId || `tpl_${Math.random().toString(36).slice(2, 10)}`;
 
       // Remove old instances for same template (or this single task if converting).
-      if (original.template_id) {
-        this._board.tasks = this._board.tasks.filter((t) => t.template_id !== original.template_id);
-      } else {
+      if (baseTemplateId) {
+        this._board.tasks = this._board.tasks.filter((t) => t.template_id !== baseTemplateId);
+      } else if (original) {
         this._board.tasks = this._board.tasks.filter((t) => t.id !== original.id);
       }
 
       // Remove old template if present.
-      if (original.template_id) {
-        this._board.templates = this._board.templates.filter((tpl) => tpl.id !== original.template_id);
+      if (baseTemplateId) {
+        this._board.templates = this._board.templates.filter((tpl) => tpl.id !== baseTemplateId);
       }
 
       const template = {
@@ -1209,10 +1240,10 @@ class HouseholdChoresCard extends HTMLElement {
       this._board.tasks = [...this._board.tasks, ...instances];
     } else {
       // If converting from fixed -> single task, remove template + template instances first.
-      if (original.template_id) {
-        this._board.templates = this._board.templates.filter((tpl) => tpl.id !== original.template_id);
-        this._board.tasks = this._board.tasks.filter((t) => t.template_id !== original.template_id);
-      } else {
+      if (baseTemplateId) {
+        this._board.templates = this._board.templates.filter((tpl) => tpl.id !== baseTemplateId);
+        this._board.tasks = this._board.tasks.filter((t) => t.template_id !== baseTemplateId);
+      } else if (original) {
         this._board.tasks = this._board.tasks.filter((t) => t.id !== original.id);
       }
 
@@ -1221,17 +1252,17 @@ class HouseholdChoresCard extends HTMLElement {
         this._board.tasks.push(...oneOffInstances);
       } else {
         this._board.tasks.push({
-          id: original.id,
+          id: original?.id || `task_${Math.random().toString(36).slice(2, 10)}`,
           title: form.title.trim(),
           assignees: [...form.assignees],
           column: form.column,
           order: this._tasksForColumn(form.column).length,
-          created_at: original.created_at,
+          created_at: originalCreatedAt,
           end_date: form.endDate || "",
           template_id: "",
           fixed: false,
           week_start: this._weekStartIso(this._weekOffset),
-          week_number: original.week_number || this._weekNumberForOffset(this._weekOffset),
+          week_number: originalWeekNumber,
         });
       }
     }
@@ -1254,11 +1285,12 @@ class HouseholdChoresCard extends HTMLElement {
     const snapshot = this._snapshotBoard();
     const form = this._taskForm;
     const task = this._board.tasks.find((t) => t.id === form.taskId);
-    if (!task) return;
+    if (!task && !form.templateId) return;
 
-    if (task.template_id) {
-      this._board.templates = this._board.templates.filter((tpl) => tpl.id !== task.template_id);
-      this._board.tasks = this._board.tasks.filter((t) => t.template_id !== task.template_id);
+    const templateId = task?.template_id || form.templateId || "";
+    if (templateId) {
+      this._board.templates = this._board.templates.filter((tpl) => tpl.id !== templateId);
+      this._board.tasks = this._board.tasks.filter((t) => t.template_id !== templateId);
     } else {
       this._board.tasks = this._board.tasks.filter((t) => t.id !== task.id);
     }
@@ -1345,7 +1377,7 @@ class HouseholdChoresCard extends HTMLElement {
   _renderTaskCard(task) {
     const draggable = !task.virtual;
     return `
-      <article class="task ${task.virtual ? "virtual-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-virtual="${task.virtual ? "1" : "0"}">
+      <article class="task ${task.virtual ? "virtual-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-template-id="${task.template_id || ""}" data-column="${task.column || ""}" data-virtual="${task.virtual ? "1" : "0"}">
         <div class="task-head">
           <div class="task-title">${this._escape(task.title)}</div>
           ${!task.virtual && task.column !== "done" ? `<button class="task-quick-done" type="button" data-task-done-id="${task.id}" title="Move to Done">Done</button>` : ""}
@@ -1911,6 +1943,8 @@ class HouseholdChoresCard extends HTMLElement {
     this.shadowRoot.querySelectorAll(".task").forEach((taskEl) => {
       const isVirtual = taskEl.dataset.virtual === "1";
       const taskId = taskEl.dataset.taskId;
+      const templateId = taskEl.dataset.templateId || "";
+      const taskColumn = taskEl.dataset.column || "backlog";
       if (!this._isReadOnlyWeekView() && !isVirtual) {
         taskEl.addEventListener("dragstart", (ev) => {
           this._draggingTask = true;
@@ -1926,6 +1960,10 @@ class HouseholdChoresCard extends HTMLElement {
 
       taskEl.addEventListener("click", () => {
         if (this._draggingTask) return;
+        if (isVirtual && templateId) {
+          this._openEditTemplateModal(templateId, taskColumn);
+          return;
+        }
         if (isVirtual) return;
         this._openEditTaskModal(taskId);
       });
