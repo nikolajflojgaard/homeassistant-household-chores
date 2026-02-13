@@ -25,9 +25,9 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - theme presets (`light`, `dark`, `colorful`)
 - Settings modal input focus is preserved while typing (no cursor drop on rerender)
 - Settings UI is redesigned with grouped sections for cleaner tablet/mobile usage
-- People use avatar badges (`adult man`, `adult woman`, `child boy`, `child girl`)
-- Avatar type is selectable on create and editable later in the People modal
-- Assignees on tasks show the selected avatar icon for quick visual recognition
+- People with unique colored circular badges and first-letter initials
+- People can be marked as `Adult` or `Child` on create, and edited later in the People modal
+- Assignee chips on tasks show role markers (`A` for Adult, `C` for Child)
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Assignee changes in Edit task now correctly enable `Save`
