@@ -48,6 +48,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Deleting a fixed task defaults to this-week occurrence only; modal checkbox allows deleting full fixed series
 - Completed lane defaults to a compact single-row height on tablet/desktop
 - Weekday card headers are minimalist: `Day + task counter` with date shown on the next line
+- Current day is highlighted with a subtle column accent + `Today` badge (current week view)
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Assignee changes in Edit task now correctly enable `Save`

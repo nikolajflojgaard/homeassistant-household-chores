@@ -283,6 +283,12 @@ class HouseholdChoresCard extends HTMLElement {
     return `${day}-${month}`;
   }
 
+  _todayWeekdayKey() {
+    const day = new Date().getDay(); // Sun=0..Sat=6
+    const idx = (day + 6) % 7; // Mon=0..Sun=6
+    return this._weekdayKeys()[idx]?.key || "monday";
+  }
+
   _weekdayNameFromIndex(index) {
     const names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const safe = Number.isFinite(Number(index)) ? Number(index) : 6;
@@ -1631,6 +1637,7 @@ class HouseholdChoresCard extends HTMLElement {
     const tasks = this._tasksVisibleByFilter(this._tasksForColumn(column.key));
     const isSideLane = column.key === "done";
     const isWeekday = this._weekdayKeys().some((day) => day.key === column.key);
+    const isTodayColumn = isWeekday && this._weekOffset === 0 && column.key === this._todayWeekdayKey();
     const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
     const emptyContent = `
       <div class="empty-wrap ${isSideLane ? "side-empty" : "week-empty"}">
@@ -1638,11 +1645,11 @@ class HouseholdChoresCard extends HTMLElement {
       </div>
     `;
     return `
-      <section class="column ${isSideLane ? "side-lane" : "week-lane"}" data-column="${column.key}">
+      <section class="column ${isSideLane ? "side-lane" : "week-lane"} ${isTodayColumn ? "today-col" : ""}" data-column="${column.key}">
         <header class="column-head">
           <div class="column-title-row">
             <h3>${this._escape(this._labelForColumn(column.key))}</h3>
-            <span class="col-count">${tasks.length}</span>
+            <span class="column-meta">${isTodayColumn ? '<span class="today-pill">Today</span>' : ""}<span class="col-count">${tasks.length}</span></span>
           </div>
           ${weekdayDate ? `<div class="col-date">${this._escape(weekdayDate)}</div>` : ""}
         </header>
@@ -2000,9 +2007,12 @@ class HouseholdChoresCard extends HTMLElement {
         .side-columns .column.side-lane .tasks{display:flex;flex-direction:row;align-items:flex-start;overflow-x:auto;overflow-y:hidden;gap:6px;padding-bottom:3px}
         .side-columns .column.side-lane .task{min-width:180px;flex:0 0 180px}
         .column.drag-over{border-color:#2563eb;box-shadow:inset 0 0 0 1px #2563eb;background:#f0f7ff}
+        .column.today-col{border-color:#93c5fd;background:linear-gradient(180deg,#eef6ff 0%, var(--hc-card) 16%)}
         .column-head{margin-bottom:8px}
         .column-title-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
         .column h3{margin:0;font-size:.82rem;font-weight:700}
+        .column-meta{display:inline-flex;align-items:center;gap:6px}
+        .today-pill{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 6px;border-radius:999px;background:#2563eb;color:#fff}
         .col-count{font-size:.76rem;color:#64748b;font-weight:600}
         .col-date{font-size:.68rem;color:#94a3b8;margin-top:2px}
         .tasks{display:grid;gap:6px;align-content:start}
