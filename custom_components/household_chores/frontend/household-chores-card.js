@@ -1941,7 +1941,7 @@ class HouseholdChoresCard extends HTMLElement {
     const isTodayColumn = isWeekday && this._weekOffset === 0 && column.key === this._todayWeekdayKey();
     const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
     const daySpanRows = isWeekday ? (this._spanLayoutCache?.dayRows?.[column.key] || 0) : 0;
-    const daySpanPad = daySpanRows > 0 ? `<div class="span-day-pad" style="height:${daySpanRows * 34}px"></div>` : "";
+    const daySpanPad = daySpanRows > 0 ? `<div class="span-day-pad" style="height:${daySpanRows * 42}px"></div>` : "";
     const emptyTitle = isWeekday ? "Tap to add" : "Drop completed";
     const emptySub = isWeekday ? "Drop here or swipe tasks" : "Tap to add or drop task";
     const emptyContent = `
@@ -2323,7 +2323,7 @@ class HouseholdChoresCard extends HTMLElement {
         .role-badge.child{background:#f59e0b;color:#111827}
         .small{font-size:.8rem;color:var(--hc-muted);margin-top:6px}
         .columns-wrap{display:grid;gap:10px}
-        .week-grid-wrap{position:relative;--week-head-offset:52px}
+        .week-grid-wrap{position:relative;--week-head-offset:58px}
         .week-span-overlay{
           position:absolute;
           top:var(--week-head-offset);
@@ -2335,7 +2335,8 @@ class HouseholdChoresCard extends HTMLElement {
           align-items:start;
           pointer-events:none;
           z-index:2;
-          min-height:calc(var(--span-rows, 0) * 34px);
+          grid-auto-rows:42px;
+          min-height:calc(var(--span-rows, 0) * 42px);
         }
         .week-span-bar{pointer-events:auto;margin-inline:8px}
         .week-scroll{overflow-x:hidden}
@@ -2365,22 +2366,22 @@ class HouseholdChoresCard extends HTMLElement {
           border-color:#b9e7ce;
           box-shadow:none;
           cursor:pointer;
-          padding:4px 8px;
-          min-height:30px;
-          gap:2px;
+          padding:7px 8px;
+          min-height:38px;
+          gap:4px;
           touch-action:pan-y;
         }
-        .task.span-task .task-head{min-height:16px;align-items:center}
+        .task.span-task .task-head{min-height:18px;align-items:flex-start}
         .task.span-task .task-title{
-          font-size:.74rem;
+          font-size:.76rem;
           font-weight:600;
-          line-height:1.1;
+          line-height:1.2;
           -webkit-line-clamp:1;
           white-space:nowrap;
           text-overflow:ellipsis;
           overflow:hidden;
         }
-        .task.span-task .task-meta{margin-top:2px}
+        .task.span-task .task-meta{margin-top:4px}
         .task.span-task.span-start{border-radius:10px 6px 6px 10px}
         .task.span-task.span-mid{border-radius:6px}
         .task.span-task.span-end{border-radius:6px 10px 10px 6px}
@@ -2603,7 +2604,9 @@ class HouseholdChoresCard extends HTMLElement {
     const weekGridWrap = this.shadowRoot.querySelector(".week-grid-wrap");
     const firstWeekHead = this.shadowRoot.querySelector(".week-columns .column.week-lane .column-head");
     if (weekGridWrap && firstWeekHead) {
-      const offset = Math.max(40, Math.round(firstWeekHead.getBoundingClientRect().height) + 4);
+      const headStyle = window.getComputedStyle(firstWeekHead);
+      const marginBottom = Number.parseFloat(headStyle.marginBottom || "0") || 0;
+      const offset = Math.max(48, Math.round(firstWeekHead.getBoundingClientRect().height + marginBottom + 6));
       weekGridWrap.style.setProperty("--week-head-offset", `${offset}px`);
     }
 
