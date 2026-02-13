@@ -30,6 +30,9 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - People color is selectable in the People modal (both on create and for existing people)
 - People modal cards now use a compact 2-column layout on tablet/desktop (single column on mobile)
 - Assignee chips on tasks show role markers (`A` for Adult, `C` for Child)
+- Person filter (`All tasks` or a specific person) in header for quicker focused view
+- Quick `Done` action button directly on task cards
+- Undo bar after delete/move actions (task move, task delete, person delete)
 - `Add` / `Create` buttons stay disabled (grey) until title/name input is filled
 - `Save` stays disabled when opening an existing task, and only enables after a real change
 - Assignee changes in Edit task now correctly enable `Save`

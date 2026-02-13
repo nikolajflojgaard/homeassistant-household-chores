@@ -28,6 +28,9 @@ class HouseholdChoresCard extends HTMLElement {
     this._swipeStartX = null;
     this._taskFormOriginal = null;
     this._taskFormDirty = false;
+    this._personFilter = "all";
+    this._undoState = null;
+    this._undoTimer = null;
 
     this._taskForm = this._emptyTaskForm("add");
     this._settingsForm = this._emptySettingsForm();
@@ -293,13 +296,16 @@ class HouseholdChoresCard extends HTMLElement {
     const validColumns = this._columns().map((c) => c.key);
 
     const currentWeekStart = this._weekStartIso(0);
-    return {
-      people: people.map((p, i) => ({
+    const normalizedPeople = people.map((p, i) => ({
         id: p.id || `person_${i}`,
         name: (p.name || "Person").trim() || "Person",
         color: p.color || this._autoColor(i),
         role: p.role === "child" ? "child" : "adult",
-      })),
+      }));
+    const knownPersonIds = new Set(normalizedPeople.map((p) => p.id));
+
+    return {
+      people: normalizedPeople,
       tasks: tasks
         .map((t, i) => {
           const column = validColumns.includes(t.column) ? t.column : "backlog";
@@ -307,7 +313,7 @@ class HouseholdChoresCard extends HTMLElement {
           return {
           id: t.id || `task_${i}`,
           title: (t.title || "").trim(),
-          assignees: Array.isArray(t.assignees) ? t.assignees : [],
+          assignees: Array.isArray(t.assignees) ? t.assignees.filter((id) => knownPersonIds.has(id)) : [],
           column,
           order: Number.isFinite(t.order) ? t.order : i,
           created_at: t.created_at || new Date().toISOString(),
@@ -323,7 +329,7 @@ class HouseholdChoresCard extends HTMLElement {
         .map((tpl, i) => ({
           id: tpl.id || `tpl_${i}`,
           title: (tpl.title || "").trim(),
-          assignees: Array.isArray(tpl.assignees) ? tpl.assignees : [],
+          assignees: Array.isArray(tpl.assignees) ? tpl.assignees.filter((id) => knownPersonIds.has(id)) : [],
           end_date: tpl.end_date || "",
           weekdays: Array.isArray(tpl.weekdays) ? tpl.weekdays : [],
           created_at: tpl.created_at || new Date().toISOString(),
@@ -346,6 +352,53 @@ class HouseholdChoresCard extends HTMLElement {
         },
       },
     };
+  }
+
+  _snapshotBoard() {
+    return JSON.parse(JSON.stringify(this._board || { people: [], tasks: [], templates: [], settings: this._defaultSettings() }));
+  }
+
+  _setUndo(label, snapshot) {
+    if (this._undoTimer) {
+      clearTimeout(this._undoTimer);
+      this._undoTimer = null;
+    }
+    this._undoState = { label, snapshot };
+    this._undoTimer = setTimeout(() => {
+      this._undoState = null;
+      this._undoTimer = null;
+      this._render();
+    }, 10000);
+  }
+
+  _clearUndo() {
+    if (this._undoTimer) {
+      clearTimeout(this._undoTimer);
+      this._undoTimer = null;
+    }
+    this._undoState = null;
+  }
+
+  async _undoLastAction() {
+    if (!this._undoState?.snapshot) return;
+    this._board = this._normalizeBoard(this._undoState.snapshot);
+    this._clearUndo();
+    this._render();
+    await this._saveBoard();
+  }
+
+  _setPersonFilter(filterValue) {
+    const value = String(filterValue || "all");
+    if (value !== "all" && !this._board.people.some((p) => p.id === value)) {
+      this._personFilter = "all";
+      return;
+    }
+    this._personFilter = value;
+  }
+
+  _tasksVisibleByFilter(tasks) {
+    if (this._personFilter === "all") return tasks;
+    return tasks.filter((task) => Array.isArray(task.assignees) && task.assignees.includes(this._personFilter));
   }
 
   async _resolveEntryId() {
@@ -397,6 +450,7 @@ class HouseholdChoresCard extends HTMLElement {
     try {
       const result = await this._callBoardWs({ type: "household_chores/get_board", entry_id: this._config.entry_id });
       this._board = this._normalizeBoard(result.board || { people: [], tasks: [], templates: [] });
+      this._setPersonFilter(this._personFilter);
       this._error = "";
     } catch (err) {
       const message = String(err?.message || err || "");
@@ -404,6 +458,7 @@ class HouseholdChoresCard extends HTMLElement {
         const fallbackBoard = this._loadBoardFromStateEntity();
         if (fallbackBoard) {
           this._board = this._normalizeBoard(fallbackBoard);
+          this._setPersonFilter(this._personFilter);
           this._error = "";
         } else {
           this._error = "Failed to load board: backend command unavailable and no board state entity found.";
@@ -456,6 +511,7 @@ class HouseholdChoresCard extends HTMLElement {
         board: this._board,
       });
       this._board = this._normalizeBoard(result.board || this._board);
+      this._setPersonFilter(this._personFilter);
       this._error = "";
     } catch (err) {
       const message = String(err?.message || err || "");
@@ -719,7 +775,9 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   async _onDeletePerson(personId) {
+    const snapshot = this._snapshotBoard();
     this._board.people = this._board.people.filter((person) => person.id !== personId);
+    this._setPersonFilter(this._personFilter);
     this._board.tasks = this._board.tasks.map((task) => ({
       ...task,
       assignees: task.assignees.filter((id) => id !== personId),
@@ -728,6 +786,7 @@ class HouseholdChoresCard extends HTMLElement {
       ...tpl,
       assignees: tpl.assignees.filter((id) => id !== personId),
     }));
+    this._setUndo("Person deleted", snapshot);
     this._render();
     await this._saveBoard();
   }
@@ -1026,6 +1085,7 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   async _onDeleteTask() {
+    const snapshot = this._snapshotBoard();
     const form = this._taskForm;
     const task = this._board.tasks.find((t) => t.id === form.taskId);
     if (!task) return;
@@ -1039,6 +1099,20 @@ class HouseholdChoresCard extends HTMLElement {
 
     this._reindexAllColumns();
     this._closeTaskModal();
+    this._setUndo("Task deleted", snapshot);
+    await this._saveBoard();
+  }
+
+  async _quickMoveTaskToDone(taskId) {
+    const task = this._board.tasks.find((item) => item.id === taskId);
+    if (!task || task.virtual || task.column === "done") return;
+    const snapshot = this._snapshotBoard();
+    task.column = "done";
+    task.week_start = this._weekStartIso(this._weekOffset);
+    task.week_number = this._weekNumberForOffset(this._weekOffset);
+    this._reindexAllColumns();
+    this._setUndo("Task moved to Done", snapshot);
+    this._render();
     await this._saveBoard();
   }
 
@@ -1104,7 +1178,10 @@ class HouseholdChoresCard extends HTMLElement {
     const draggable = !task.virtual;
     return `
       <article class="task ${task.virtual ? "virtual-task" : ""}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-virtual="${task.virtual ? "1" : "0"}">
-        <div class="task-title">${this._escape(task.title)}</div>
+        <div class="task-head">
+          <div class="task-title">${this._escape(task.title)}</div>
+          ${!task.virtual && task.column !== "done" ? `<button class="task-quick-done" type="button" data-task-done-id="${task.id}" title="Move to Done">Done</button>` : ""}
+        </div>
         ${this._taskMetaLine(task)}
         <div class="task-meta">${this._assigneeChips(task)}</div>
       </article>
@@ -1112,7 +1189,7 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _renderColumn(column) {
-    const tasks = this._tasksForColumn(column.key);
+    const tasks = this._tasksVisibleByFilter(this._tasksForColumn(column.key));
     const isSideLane = column.key === "backlog" || column.key === "done";
     const isWeekday = this._weekdayKeys().some((day) => day.key === column.key);
     const weekdayDate = isWeekday ? this._formatWeekdayDate(column.key) : "";
@@ -1157,6 +1234,19 @@ class HouseholdChoresCard extends HTMLElement {
               </div>`
           )
           .join("")}
+      </div>
+    `;
+  }
+
+  _renderAssigneeFilter() {
+    const options = [
+      `<option value="all" ${this._personFilter === "all" ? "selected" : ""}>All tasks</option>`,
+      ...this._board.people.map((person) => `<option value="${person.id}" ${this._personFilter === person.id ? "selected" : ""}>${this._escape(person.name)}</option>`),
+    ];
+    return `
+      <div class="assignee-filter">
+        <label for="assignee-filter-select">Filter</label>
+        <select id="assignee-filter-select">${options.join("")}</select>
       </div>
     `;
   }
@@ -1307,6 +1397,7 @@ class HouseholdChoresCard extends HTMLElement {
     const focusState = this._captureFocusState();
     const loadingHtml = this._loading ? `<div class="loading">Loading board...</div>` : "";
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
+    const undoHtml = this._undoState ? `<div class="undo-bar"><span>${this._escape(this._undoState.label)}</span><button id="undo-action-btn" type="button">Undo</button></div>` : "";
     const theme = this._themeVars();
 
     this.shadowRoot.innerHTML = `
@@ -1317,6 +1408,11 @@ class HouseholdChoresCard extends HTMLElement {
         .board-title{margin:0;padding:2px 0 0;font-size:2rem;line-height:1.1;font-weight:500;color:var(--hc-text)}
         .panel{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:14px;padding:10px}
         .top-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+        .assignee-filter{display:flex;align-items:center;gap:6px}
+        .assignee-filter label{font-size:.78rem;color:#475569;font-weight:600}
+        .assignee-filter select{padding:6px 8px;min-width:130px}
+        .undo-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;padding:8px 10px;border-radius:9px;font-size:.82rem}
+        #undo-action-btn{background:#dbeafe;border-color:#93c5fd;color:#1e40af;padding:6px 10px;font-weight:700}
         .week-nav{display:flex;align-items:center;gap:8px}
         .week-nav-btn{border:1px solid #94a3b8;background:#fff;color:#1e293b;border-radius:10px;padding:6px 10px;font-weight:700;cursor:pointer}
         .week-label{font-weight:700;font-size:.92rem}
@@ -1356,7 +1452,9 @@ class HouseholdChoresCard extends HTMLElement {
         .tasks{display:grid;gap:6px;align-content:start}
         .task{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:7px;cursor:grab;user-select:none}
         .task.virtual-task{cursor:default;opacity:.96}
+        .task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
         .task-title{font-size:.78rem;font-weight:600;line-height:1.25}
+        .task-quick-done{padding:3px 6px;border-radius:8px;border:1px solid #86efac;background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;cursor:pointer}
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
         .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
         .empty-wrap{display:grid;gap:6px;align-content:start}
@@ -1430,6 +1528,7 @@ class HouseholdChoresCard extends HTMLElement {
           <h2 class="board-title">${this._escape(this._boardTitle())}</h2>
           ${loadingHtml}
           ${errorHtml}
+          ${undoHtml}
           <div class="panel">
             <div class="top-row">
               <div>
@@ -1443,7 +1542,10 @@ class HouseholdChoresCard extends HTMLElement {
                 </div>
               </div>
               <div class="swipe-hint">Swipe left/right to browse weeks (0..+3)</div>
-              <button class="week-nav-btn" type="button" id="open-settings">⚙</button>
+              <div class="row">
+                ${this._renderAssigneeFilter()}
+                <button class="week-nav-btn" type="button" id="open-settings">⚙</button>
+              </div>
             </div>
             <div class="people-strip" id="open-people" role="button" tabindex="0" aria-label="Open people">
               <span class="people-strip-label">People</span>
@@ -1502,6 +1604,8 @@ class HouseholdChoresCard extends HTMLElement {
     const deletePersonButtons = this.shadowRoot.querySelectorAll("[data-delete-person-id]");
     const personRoleSelects = this.shadowRoot.querySelectorAll("[data-person-role-id]");
     const personColorSelects = this.shadowRoot.querySelectorAll("[data-person-color-id]");
+    const assigneeFilterSelect = this.shadowRoot.querySelector("#assignee-filter-select");
+    const undoActionBtn = this.shadowRoot.querySelector("#undo-action-btn");
 
     if (openPeopleBtn) {
       openPeopleBtn.addEventListener("click", () => this._openPeopleModal());
@@ -1513,6 +1617,11 @@ class HouseholdChoresCard extends HTMLElement {
       });
     }
     if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => this._openSettingsModal());
+    if (assigneeFilterSelect) assigneeFilterSelect.addEventListener("change", (ev) => {
+      this._setPersonFilter(ev.target.value);
+      this._render();
+    });
+    if (undoActionBtn) undoActionBtn.addEventListener("click", async () => this._undoLastAction());
     if (weekPrevBtn) weekPrevBtn.addEventListener("click", () => this._shiftWeek(-1));
     if (weekNextBtn) weekNextBtn.addEventListener("click", () => this._shiftWeek(1));
     if (closePeopleBtn) closePeopleBtn.addEventListener("click", () => this._closePeopleModal());
@@ -1620,6 +1729,13 @@ class HouseholdChoresCard extends HTMLElement {
       });
     });
 
+    this.shadowRoot.querySelectorAll("[data-task-done-id]").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        await this._quickMoveTaskToDone(btn.dataset.taskDoneId);
+      });
+    });
+
     this.shadowRoot.querySelectorAll(".column").forEach((columnEl) => {
       const columnKey = columnEl.dataset.column;
       columnEl.addEventListener("click", (ev) => {
@@ -1656,10 +1772,13 @@ class HouseholdChoresCard extends HTMLElement {
 
         const task = this._board.tasks.find((t) => t.id === taskId);
         if (!task) return;
+        if (task.column === columnKey) return;
+        const snapshot = this._snapshotBoard();
         task.column = columnKey;
         task.week_start = this._weekStartIso(this._weekOffset);
         task.week_number = this._weekNumberForOffset(this._weekOffset);
         this._reindexAllColumns();
+        this._setUndo(`Task moved to ${this._labelForColumn(columnKey)}`, snapshot);
         this._render();
         await this._saveBoard();
       });
