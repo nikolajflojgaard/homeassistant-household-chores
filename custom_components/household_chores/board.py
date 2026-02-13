@@ -60,6 +60,7 @@ class Task:
     end_date: str | None = None
     template_id: str | None = None
     fixed: bool = False
+    week_start: str | None = None
 
 
 class HouseholdBoardStore:
@@ -115,6 +116,7 @@ class HouseholdBoardStore:
         """
         board = await self.async_load()
         today = dt_util.as_local(dt_util.utcnow()).date()
+        current_monday = _week_start_for_day(today)
 
         templates = board.get("templates", [])
         active_templates: list[dict[str, Any]] = []
@@ -143,16 +145,26 @@ class HouseholdBoardStore:
                 continue
 
             end_date = _parse_date(task.get("end_date"))
-            if end_date is None or end_date < today:
+            if end_date is not None and end_date < today:
                 continue
 
-            # Fixed tasks are regenerated from template each week.
+            week_start = _parse_date(task.get("week_start"))
+            if column in WEEKDAY_INDEX:
+                if week_start is None:
+                    week_start = current_monday
+                # Weekly reset clears only the weeks behind us.
+                if week_start < current_monday:
+                    continue
+
+            # Fixed tasks are regenerated from template on refresh.
             if task.get("template_id"):
                 continue
 
-            kept_tasks.append(task)
+            normalized_task = dict(task)
+            normalized_task["week_start"] = week_start.isoformat() if week_start else None
+            kept_tasks.append(normalized_task)
 
-        refreshed_tasks = kept_tasks + self._build_week_tasks_from_templates(active_templates, today)
+        refreshed_tasks = kept_tasks + self._build_week_tasks_from_templates(active_templates, current_monday)
         board["templates"] = active_templates
         board["tasks"] = refreshed_tasks
         await self.async_save(board)
@@ -161,37 +173,38 @@ class HouseholdBoardStore:
     def _build_week_tasks_from_templates(
         self,
         templates: list[dict[str, Any]],
-        today: date,
+        start_monday: date,
     ) -> list[dict[str, Any]]:
-        current_monday = today - timedelta(days=today.weekday())
-        next_monday = current_monday + timedelta(days=7)
-
         generated: list[dict[str, Any]] = []
+        # Keep current week plus 3 weeks ahead pre-generated.
+        week_starts = [start_monday + timedelta(days=offset * 7) for offset in range(0, 4)]
         for template in templates:
             end_date = _parse_date(template["end_date"])
             if end_date is None:
                 continue
 
-            for weekday in template["weekdays"]:
-                day_date = next_monday + timedelta(days=WEEKDAY_INDEX[weekday])
-                if day_date > end_date:
-                    continue
+            for week_start in week_starts:
+                for weekday in template["weekdays"]:
+                    day_date = week_start + timedelta(days=WEEKDAY_INDEX[weekday])
+                    if day_date > end_date:
+                        continue
 
-                generated.append(
-                    asdict(
-                        Task(
-                            id=f"task_{uuid4().hex[:12]}",
-                            title=template["title"],
-                            assignees=template["assignees"],
-                            column=weekday,
-                            order=0,
-                            created_at=datetime.now(UTC).isoformat(),
-                            end_date=end_date.isoformat(),
-                            template_id=template["id"],
-                            fixed=True,
+                    generated.append(
+                        asdict(
+                            Task(
+                                id=f"task_{uuid4().hex[:12]}",
+                                title=template["title"],
+                                assignees=template["assignees"],
+                                column=weekday,
+                                order=0,
+                                created_at=datetime.now(UTC).isoformat(),
+                                end_date=end_date.isoformat(),
+                                template_id=template["id"],
+                                fixed=True,
+                                week_start=week_start.isoformat(),
+                            )
                         )
                     )
-                )
 
         return generated
 
@@ -202,6 +215,7 @@ class HouseholdBoardStore:
         ]
 
         created = datetime.now(UTC).isoformat()
+        current_monday = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date()).isoformat()
         tasks: list[Task] = []
         for index, title in enumerate(self._chores):
             assignees = [people[index % len(people)].id] if people else []
@@ -213,6 +227,7 @@ class HouseholdBoardStore:
                     column=WEEKDAY_COLUMNS[index % len(WEEKDAY_COLUMNS)],
                     order=index,
                     created_at=created,
+                    week_start=current_monday,
                 )
             )
 
@@ -292,6 +307,9 @@ class HouseholdBoardStore:
             end_date = _parse_date(task.get("end_date"))
             template_id = str(task.get("template_id")) if task.get("template_id") else None
             fixed = bool(task.get("fixed", False))
+            week_start = _parse_date(task.get("week_start"))
+            if column in WEEKDAY_INDEX and week_start is None:
+                week_start = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date())
 
             normalized_tasks.append(
                 {
@@ -304,6 +322,7 @@ class HouseholdBoardStore:
                     "end_date": end_date.isoformat() if end_date else None,
                     "template_id": template_id,
                     "fixed": fixed,
+                    "week_start": week_start.isoformat() if week_start else None,
                 }
             )
 
@@ -334,3 +353,8 @@ def _parse_date(value: Any) -> date | None:
         return date.fromisoformat(raw)
     except ValueError:
         return None
+
+
+def _week_start_for_day(day_value: date) -> date:
+    """Return Monday date for ISO week containing the given date."""
+    return day_value - timedelta(days=day_value.weekday())

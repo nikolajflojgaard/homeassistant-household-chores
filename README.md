@@ -99,6 +99,8 @@ The screenshots below are updated with each UI/layout release.
 - Tasks moved to `Done` are automatically deleted nightly at `03:00` (Home Assistant local time).
 - Weekly board refresh time is configurable in integration options (`day`, `hour`, `minute`).
 - On weekly refresh:
-  - tasks without an `end date` are removed
-  - expired tasks are removed
-  - fixed recurring tasks are rebuilt for the upcoming Monday-Sunday week (until their end date)
+  - `Done` tasks are removed by nightly cleanup (`03:00`)
+  - only past week weekday tasks are cleared (the week you leave)
+  - future week tasks are kept
+  - expired tasks (`end_date` < today) are removed
+  - fixed recurring tasks are rebuilt for current week + up to 3 weeks ahead (until their end date)

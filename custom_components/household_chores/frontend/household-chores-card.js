@@ -145,6 +145,10 @@ class HouseholdChoresCard extends HTMLElement {
     return dateObj.toISOString().slice(0, 10);
   }
 
+  _weekStartIso(offset = this._weekOffset) {
+    return this._toIsoDate(this._startOfWeek(new Date(), offset));
+  }
+
   _isoWeekNumber(dateObj) {
     const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
     const day = d.getUTCDay() || 7;
@@ -200,6 +204,7 @@ class HouseholdChoresCard extends HTMLElement {
     const templates = Array.isArray(board.templates) ? board.templates : [];
     const validColumns = this._columns().map((c) => c.key);
 
+    const currentWeekStart = this._weekStartIso(0);
     return {
       people: people.map((p, i) => ({
         id: p.id || `person_${i}`,
@@ -207,17 +212,22 @@ class HouseholdChoresCard extends HTMLElement {
         color: p.color || this._autoColor(i),
       })),
       tasks: tasks
-        .map((t, i) => ({
+        .map((t, i) => {
+          const column = validColumns.includes(t.column) ? t.column : "backlog";
+          const isWeekday = this._weekdayKeys().some((day) => day.key === column);
+          return {
           id: t.id || `task_${i}`,
           title: (t.title || "").trim(),
           assignees: Array.isArray(t.assignees) ? t.assignees : [],
-          column: validColumns.includes(t.column) ? t.column : "backlog",
+          column,
           order: Number.isFinite(t.order) ? t.order : i,
           created_at: t.created_at || new Date().toISOString(),
           end_date: t.end_date || "",
           template_id: t.template_id || "",
           fixed: Boolean(t.fixed),
-        }))
+          week_start: isWeekday ? (t.week_start || currentWeekStart) : "",
+        };
+        })
         .filter((t) => t.title),
       templates: templates
         .map((tpl, i) => ({
@@ -364,8 +374,21 @@ class HouseholdChoresCard extends HTMLElement {
 
   _tasksForColumn(column) {
     const isWeekdayColumn = this._weekdayKeys().some((day) => day.key === column);
-    if (isWeekdayColumn && this._weekOffset > 0) {
-      return this._projectedTasksForFutureWeekday(column, this._weekOffset);
+    if (isWeekdayColumn) {
+      const selectedWeekStart = this._weekStartIso(this._weekOffset);
+      const currentWeekStart = this._weekStartIso(0);
+      const stored = this._board.tasks
+        .filter((t) => t.column === column)
+        .filter((t) => (t.week_start || currentWeekStart) === selectedWeekStart)
+        .sort((a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at));
+
+      if (this._weekOffset > 0) {
+        const projected = this._projectedTasksForFutureWeekday(column, this._weekOffset).filter(
+          (task) => !stored.some((item) => item.template_id && item.template_id === task.template_id)
+        );
+        return [...stored, ...projected];
+      }
+      return stored;
     }
     return this._board.tasks
       .filter((t) => t.column === column)
@@ -389,6 +412,7 @@ class HouseholdChoresCard extends HTMLElement {
         end_date: tpl.end_date,
         template_id: tpl.id,
         fixed: true,
+        week_start: this._weekStartIso(weekOffset),
         virtual: true,
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
@@ -596,6 +620,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   _buildFixedInstancesForCurrentWeek(template, title, assignees) {
     const todayIso = this._todayIsoDate();
+    const weekStart = this._weekStartIso(0);
     const items = [];
     for (const dayKey of template.weekdays) {
       const dayDate = this._weekdayDateForCurrentWeek(dayKey);
@@ -613,12 +638,13 @@ class HouseholdChoresCard extends HTMLElement {
         end_date: template.end_date,
         template_id: template.id,
         fixed: true,
+        week_start: weekStart,
       });
     }
     return items;
   }
 
-  _buildOneOffWeekdayInstances(title, assignees, weekdays, endDate = "") {
+  _buildOneOffWeekdayInstances(title, assignees, weekdays, endDate = "", weekStart = this._weekStartIso(this._weekOffset)) {
     const items = [];
     for (const dayKey of weekdays) {
       items.push({
@@ -631,6 +657,7 @@ class HouseholdChoresCard extends HTMLElement {
         end_date: endDate || "",
         template_id: "",
         fixed: false,
+        week_start: weekStart,
       });
     }
     return items;
@@ -668,6 +695,7 @@ class HouseholdChoresCard extends HTMLElement {
       const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
       this._board.tasks = [...this._board.tasks, ...oneOffInstances];
     } else {
+      const isWeekday = this._weekdayKeys().some((item) => item.key === form.column);
       this._board.tasks = [
         ...this._board.tasks,
         {
@@ -680,6 +708,7 @@ class HouseholdChoresCard extends HTMLElement {
         end_date: form.endDate || "",
         template_id: "",
         fixed: false,
+        week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
       },
       ];
     }
@@ -740,6 +769,7 @@ class HouseholdChoresCard extends HTMLElement {
         const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
         this._board.tasks.push(...oneOffInstances);
       } else {
+        const isWeekday = this._weekdayKeys().some((item) => item.key === form.column);
         this._board.tasks.push({
           id: original.id,
           title: form.title.trim(),
@@ -750,6 +780,7 @@ class HouseholdChoresCard extends HTMLElement {
           end_date: form.endDate || "",
           template_id: "",
           fixed: false,
+          week_start: isWeekday ? this._weekStartIso(this._weekOffset) : "",
         });
       }
     }
@@ -1248,6 +1279,8 @@ class HouseholdChoresCard extends HTMLElement {
         const task = this._board.tasks.find((t) => t.id === taskId);
         if (!task) return;
         task.column = columnKey;
+        const isWeekday = this._weekdayKeys().some((day) => day.key === columnKey);
+        task.week_start = isWeekday ? this._weekStartIso(this._weekOffset) : "";
         this._reindexAllColumns();
         this._render();
         await this._saveBoard();
