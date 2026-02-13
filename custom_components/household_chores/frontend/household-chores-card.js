@@ -1941,7 +1941,7 @@ class HouseholdChoresCard extends HTMLElement {
     const isTodayColumn = isWeekday && this._weekOffset === 0 && column.key === this._todayWeekdayKey();
     const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
     const daySpanRows = isWeekday ? (this._spanLayoutCache?.dayRows?.[column.key] || 0) : 0;
-    const daySpanPad = daySpanRows > 0 ? `<div class="span-day-pad" style="height:${daySpanRows * 42 + 6}px"></div>` : "";
+    const daySpanPad = daySpanRows > 0 ? `<div class="span-day-pad" style="height:${daySpanRows * 56 + 6}px"></div>` : "";
     const emptyTitle = isWeekday ? "Tap to add" : "Drop completed";
     const emptySub = isWeekday ? "Drop here or swipe tasks" : "Tap to add or drop task";
     const emptyContent = `
@@ -2291,6 +2291,7 @@ class HouseholdChoresCard extends HTMLElement {
     const loadingHtml = this._loading ? `<div class="loading">Loading board...</div>` : "";
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
     const undoHtml = this._undoState ? `<div class="undo-bar"><span>${this._escape(this._undoState.label)}</span><button id="undo-action-btn" type="button">Undo</button></div>` : "";
+    const upcomingHtml = this._renderUpcomingStrip();
     const theme = this._themeVars();
     const compactMode = Boolean(this._board?.settings?.compact_mode);
     const weekLaneHeight = compactMode ? 320 : 360;
@@ -2306,6 +2307,7 @@ class HouseholdChoresCard extends HTMLElement {
         .board-title{margin:0;padding:0;font-size:1.55rem;line-height:1.1;font-weight:600;letter-spacing:-.01em;color:var(--hc-text)}
         .panel{background:var(--hc-card);border:1px solid var(--hc-border);border-radius:14px;padding:10px}
         .top-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}
+        .top-row.has-upcoming{grid-template-columns:auto minmax(240px,1fr) auto}
         .assignee-filter{display:flex;align-items:center;gap:6px}
         .assignee-filter label{font-size:.74rem;color:#64748b;font-weight:600}
         .assignee-filter select{padding:6px 8px;min-width:120px;height:34px}
@@ -2328,7 +2330,7 @@ class HouseholdChoresCard extends HTMLElement {
         .people-strip:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
         .people-strip-label{font-size:.76rem;font-weight:700;color:#334155;margin-right:2px}
         .people-strip-empty{font-size:.78rem;color:#64748b}
-        .upcoming-strip{margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px}
+        .upcoming-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:6px 8px;min-height:38px}
         .upcoming-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#64748b}
         .upcoming-pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ef;border-radius:999px;padding:4px 8px;font-size:.76rem;color:#334155}
         .upcoming-pill strong{font-size:.72rem;color:#475569}
@@ -2363,7 +2365,8 @@ class HouseholdChoresCard extends HTMLElement {
           pointer-events:none;
           z-index:2;
           grid-auto-rows:42px;
-          min-height:calc(var(--span-rows, 0) * 42px);
+          grid-auto-rows:56px;
+          min-height:calc(var(--span-rows, 0) * 56px);
         }
         .week-span-bar{pointer-events:auto;margin-inline:8px}
         .week-scroll{overflow-x:hidden}
@@ -2394,7 +2397,7 @@ class HouseholdChoresCard extends HTMLElement {
           box-shadow:none;
           cursor:pointer;
           padding:7px 8px;
-          min-height:38px;
+          min-height:50px;
           gap:4px;
           touch-action:pan-y;
         }
@@ -2529,7 +2532,7 @@ class HouseholdChoresCard extends HTMLElement {
           ${errorHtml}
           ${undoHtml}
           <div class="panel">
-            <div class="top-row">
+            <div class="top-row ${upcomingHtml ? "has-upcoming" : ""}">
               <div class="week-nav">
                 <button class="week-nav-btn" type="button" id="week-prev" ${this._weekOffset === 0 ? "disabled" : ""}>◀</button>
                 <div>
@@ -2538,6 +2541,7 @@ class HouseholdChoresCard extends HTMLElement {
                 </div>
                 <button class="week-nav-btn" type="button" id="week-next" ${this._weekOffset >= this._maxWeekOffset ? "disabled" : ""}>▶</button>
               </div>
+              ${upcomingHtml ? `<div>${upcomingHtml}</div>` : ""}
               <div class="header-actions">
                 <div class="swipe-hint">Swipe left/right (0..+3)</div>
                 ${this._renderActiveFilterChip()}
@@ -2546,7 +2550,6 @@ class HouseholdChoresCard extends HTMLElement {
               </div>
             </div>
             ${this._renderOnboardingBanner()}
-            ${this._renderUpcomingStrip()}
             <div class="people-strip" id="open-people" role="button" tabindex="0" aria-label="Open people">
               <span class="people-strip-label">People</span>
               ${
