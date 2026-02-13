@@ -23,6 +23,8 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - weekly reset day/time
   - done cleanup time
   - theme presets (`light`, `dark`, `colorful`)
+- Settings modal input focus is preserved while typing (no cursor drop on rerender)
+- Settings UI is redesigned with grouped sections for cleaner tablet/mobile usage
 - People with unique colored circular badges and first-letter initials
 - People can be marked as `Adult` or `Child` on create, and edited later in the People modal
 - Assignee chips on tasks show role markers (`A` for Adult, `C` for Child)

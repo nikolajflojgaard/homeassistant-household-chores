@@ -733,9 +733,12 @@ class HouseholdChoresCard extends HTMLElement {
 
   _captureFocusState() {
     const active = this.shadowRoot?.activeElement;
-    if (!active || !active.id) return null;
+    if (!active) return null;
 
-    const state = { id: active.id };
+    const key = active.id || active.getAttribute?.("data-focus-key") || "";
+    if (!key) return null;
+
+    const state = { key };
     if (typeof active.selectionStart === "number" && typeof active.selectionEnd === "number") {
       state.selectionStart = active.selectionStart;
       state.selectionEnd = active.selectionEnd;
@@ -744,8 +747,10 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _restoreFocusState(state) {
-    if (!state?.id || !this.shadowRoot) return;
-    const el = this.shadowRoot.querySelector(`#${state.id}`);
+    if (!state?.key || !this.shadowRoot) return;
+    const el = state.key.includes("#")
+      ? this.shadowRoot.querySelector(state.key)
+      : this.shadowRoot.querySelector(`#${state.key}`) || this.shadowRoot.querySelector(`[data-focus-key="${state.key}"]`);
     if (!el || typeof el.focus !== "function") return;
 
     el.focus({ preventScroll: true });
@@ -1173,25 +1178,39 @@ class HouseholdChoresCard extends HTMLElement {
     const form = this._settingsForm || this._defaultSettings();
     return `
       <div class="modal-backdrop" id="settings-backdrop">
-        <div class="modal">
+        <div class="modal settings-modal">
           <div class="modal-head">
             <h3>Board settings</h3>
             <button type="button" class="close-btn" id="close-settings">X</button>
           </div>
-          <form class="task-form" id="settings-form">
-            <input id="settings-title" type="text" placeholder="Board title" value="${this._escape(form.title || "")}" />
-            <select id="settings-theme">
-              <option value="light" ${form.theme === "light" ? "selected" : ""}>Light</option>
-              <option value="dark" ${form.theme === "dark" ? "selected" : ""}>Dark</option>
-              <option value="colorful" ${form.theme === "colorful" ? "selected" : ""}>Colorful</option>
-            </select>
-            <div class="small">Labels</div>
-            <div class="legend-list">
-              ${this._columns().map((col) => `<label>${this._escape(col.label)}<input data-label-key="${col.key}" type="text" value="${this._escape(form.labels?.[col.key] || this._labelForColumn(col.key))}" /></label>`).join("")}
-            </div>
-            <div class="small">Weekly reset</div>
-            <div class="row">
-              <select id="settings-weekday">
+          <form class="task-form settings-form" id="settings-form">
+            <section class="settings-section">
+              <h4>General</h4>
+              <label class="settings-field">
+                <span>Board title</span>
+                <input id="settings-title" data-focus-key="settings-title" type="text" placeholder="Board title" value="${this._escape(form.title || "")}" />
+              </label>
+              <label class="settings-field">
+                <span>Theme</span>
+                <select id="settings-theme">
+                  <option value="light" ${form.theme === "light" ? "selected" : ""}>Light</option>
+                  <option value="dark" ${form.theme === "dark" ? "selected" : ""}>Dark</option>
+                  <option value="colorful" ${form.theme === "colorful" ? "selected" : ""}>Colorful</option>
+                </select>
+              </label>
+            </section>
+
+            <section class="settings-section">
+              <h4>Lane Labels</h4>
+              <div class="settings-grid labels-grid">
+                ${this._columns().map((col) => `<label class="settings-field"><span>${this._escape(col.label)}</span><input data-label-key="${col.key}" data-focus-key="label-${col.key}" type="text" value="${this._escape(form.labels?.[col.key] || this._labelForColumn(col.key))}" /></label>`).join("")}
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <h4>Weekly Reset</h4>
+              <div class="settings-inline">
+                <select id="settings-weekday">
                 <option value="0" ${String(form.weekly_refresh?.weekday) === "0" ? "selected" : ""}>Mon</option>
                 <option value="1" ${String(form.weekly_refresh?.weekday) === "1" ? "selected" : ""}>Tue</option>
                 <option value="2" ${String(form.weekly_refresh?.weekday) === "2" ? "selected" : ""}>Wed</option>
@@ -1199,15 +1218,21 @@ class HouseholdChoresCard extends HTMLElement {
                 <option value="4" ${String(form.weekly_refresh?.weekday) === "4" ? "selected" : ""}>Fri</option>
                 <option value="5" ${String(form.weekly_refresh?.weekday) === "5" ? "selected" : ""}>Sat</option>
                 <option value="6" ${String(form.weekly_refresh?.weekday) === "6" ? "selected" : ""}>Sun</option>
-              </select>
-              <input id="settings-refresh-hour" type="number" min="0" max="23" value="${this._escape(form.weekly_refresh?.hour ?? 0)}" />
-              <input id="settings-refresh-minute" type="number" min="0" max="59" value="${this._escape(form.weekly_refresh?.minute ?? 30)}" />
-            </div>
-            <div class="small">Done cleanup time</div>
-            <div class="row">
-              <input id="settings-cleanup-hour" type="number" min="0" max="23" value="${this._escape(form.done_cleanup?.hour ?? 3)}" />
-              <input id="settings-cleanup-minute" type="number" min="0" max="59" value="${this._escape(form.done_cleanup?.minute ?? 0)}" />
-            </div>
+                </select>
+                <input id="settings-refresh-hour" data-focus-key="settings-refresh-hour" type="number" min="0" max="23" value="${this._escape(form.weekly_refresh?.hour ?? 0)}" />
+                <span>:</span>
+                <input id="settings-refresh-minute" data-focus-key="settings-refresh-minute" type="number" min="0" max="59" value="${this._escape(form.weekly_refresh?.minute ?? 30)}" />
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <h4>Done Cleanup</h4>
+              <div class="settings-inline">
+                <input id="settings-cleanup-hour" data-focus-key="settings-cleanup-hour" type="number" min="0" max="23" value="${this._escape(form.done_cleanup?.hour ?? 3)}" />
+                <span>:</span>
+                <input id="settings-cleanup-minute" data-focus-key="settings-cleanup-minute" type="number" min="0" max="59" value="${this._escape(form.done_cleanup?.minute ?? 0)}" />
+              </div>
+            </section>
             <div class="modal-actions">
               <button type="submit" id="settings-submit">Save settings</button>
             </div>
@@ -1285,6 +1310,7 @@ class HouseholdChoresCard extends HTMLElement {
         input,select{background:#fff;color:var(--hc-text)}
         .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:999;padding:14px}
         .modal{width:min(540px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:14px;border:1px solid var(--hc-border);padding:12px;box-shadow:0 18px 50px rgba(2,6,23,.28)}
+        .settings-modal{width:min(760px,100%);padding:14px}
         .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
         .modal-head h3{margin:0;font-size:1rem}
         .close-btn{background:#e2e8f0;color:#0f172a;border:1px solid #cbd5e1;min-width:36px;padding:6px 10px}
@@ -1303,6 +1329,15 @@ class HouseholdChoresCard extends HTMLElement {
         .assignees label{display:flex;align-items:center;gap:5px;font-size:.78rem}
         .modal-actions{display:flex;justify-content:space-between;gap:8px}
         .danger{background:#b91c1c;color:#fff;border-color:transparent}
+        .settings-form{gap:12px}
+        .settings-section{border:1px solid #dbe3ef;border-radius:12px;padding:10px;background:#f8fafc}
+        .settings-section h4{margin:0 0 8px;font-size:.86rem;color:#334155}
+        .settings-grid{display:grid;gap:8px}
+        .labels-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+        .settings-field{display:grid;gap:4px;font-size:.78rem;color:#475569}
+        .settings-field span{font-weight:600}
+        .settings-inline{display:flex;align-items:center;gap:8px}
+        #settings-submit{margin-left:auto;background:#2563eb;color:#fff;border-color:#1d4ed8;font-weight:700}
         @media (max-width:900px){
           .side-columns{grid-template-columns:1fr}
           .column h3{font-size:.76rem}
@@ -1321,6 +1356,8 @@ class HouseholdChoresCard extends HTMLElement {
             width:auto;
             flex:none;
           }
+          .settings-inline{flex-wrap:wrap}
+          .labels-grid{grid-template-columns:1fr 1fr}
         }
       </style>
 
