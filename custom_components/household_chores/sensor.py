@@ -210,7 +210,7 @@ class PersonWeekTasksSensor(SensorEntity):
     @property
     def suggested_object_id(self) -> str | None:
         # Gives stable, predictable entity_id on first creation.
-        return f"{slugify(self._person_name)}_tasks"
+        return f"household_chores_{slugify(self._person_name)}_tasks"
 
     @property
     def available(self) -> bool:
@@ -282,7 +282,7 @@ class NextThreeTasksSensor(SensorEntity):
 
     @property
     def suggested_object_id(self) -> str | None:
-        return "next_3_tasks"
+        return "household_chores_next_3_tasks"
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to board update events."""
@@ -368,7 +368,7 @@ class NextThreeTasksPersonSensor(SensorEntity):
 
     @property
     def suggested_object_id(self) -> str | None:
-        return f"{slugify(self._person_name)}_next_3_tasks"
+        return f"household_chores_{slugify(self._person_name)}_next_3_tasks"
 
     @property
     def available(self) -> bool:
