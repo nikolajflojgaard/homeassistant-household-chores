@@ -153,8 +153,17 @@ def person_week_stats(board: dict[str, Any], person_id: str, week_offset: int = 
     }
 
 
-def next_three_tasks_summary(board: dict[str, Any], limit: int = 3) -> dict[str, Any]:
-    """Return the next N open tasks from today and forward."""
+def next_three_tasks_summary(
+    board: dict[str, Any],
+    limit: int = 3,
+    *,
+    person_id: str | None = None,
+) -> dict[str, Any]:
+    """Return the next N open tasks from today and forward.
+
+    If person_id is provided, only include tasks assigned to that person.
+    Span (all-day multi-day) tasks are de-duplicated so they count once.
+    """
     today = dt_util.as_local(dt_util.utcnow()).date()
     current_week_start = _start_of_week(today)
     people = board.get("people", []) if isinstance(board, dict) else []
@@ -164,6 +173,9 @@ def next_three_tasks_summary(board: dict[str, Any], limit: int = 3) -> dict[str,
         for person in people
         if isinstance(person, dict) and str(person.get("id", "")).strip()
     }
+    person_name_key = ""
+    if person_id:
+        person_name_key = str(people_by_id.get(str(person_id).strip(), "")).strip().lower()
 
     def _task_date(raw: dict[str, Any]) -> date | None:
         column = str(raw.get("column") or "").lower()
@@ -174,7 +186,8 @@ def next_three_tasks_summary(board: dict[str, Any], limit: int = 3) -> dict[str,
         normalized_start = _start_of_week(week_start_day if week_start_day is not None else current_week_start)
         return normalized_start + timedelta(days=WEEKDAY_INDEX[column])
 
-    rows: list[dict[str, Any]] = []
+    # De-dupe span tasks so they count once. Keep min/max date.
+    grouped: dict[str, dict[str, Any]] = {}
     for raw in tasks:
         if not isinstance(raw, dict):
             continue
@@ -184,21 +197,42 @@ def next_three_tasks_summary(board: dict[str, Any], limit: int = 3) -> dict[str,
         if due_day is None or due_day < today:
             continue
         assignee_ids = [str(item).strip() for item in raw.get("assignees", []) if str(item).strip()]
+        if person_id:
+            pid = str(person_id).strip()
+            assignees_lower = [item.lower() for item in assignee_ids]
+            if pid not in assignee_ids and person_name_key and person_name_key not in assignees_lower:
+                continue
         assignee_names = [people_by_id.get(item, item) for item in assignee_ids]
-        rows.append(
-            {
+        span_id = str(raw.get("span_id") or "").strip()
+        raw_week_start = str(raw.get("week_start") or (due_day - timedelta(days=due_day.weekday())).isoformat())
+        group_key = f"span:{span_id}:{raw_week_start}" if span_id else f"task:{str(raw.get('id') or '').strip()}"
+        item = grouped.get(group_key)
+        if item is None:
+            item = {
                 "id": str(raw.get("id") or ""),
                 "title": str(raw.get("title") or "Untitled task"),
                 "date": due_day.isoformat(),
+                "start_date": due_day.isoformat(),
+                "end_date": due_day.isoformat(),
                 "column": str(raw.get("column") or "").lower(),
                 "week_start": (due_day - timedelta(days=due_day.weekday())).isoformat(),
                 "week_number": _week_number(due_day),
                 "assignees": assignee_ids,
                 "assignee_names": assignee_names,
+                "span_id": span_id,
                 "order": int(raw.get("order") or 0),
             }
-        )
+            grouped[group_key] = item
+        else:
+            # Expand range for span tasks.
+            if due_day.isoformat() < str(item.get("start_date") or item["date"]):
+                item["start_date"] = due_day.isoformat()
+                item["date"] = due_day.isoformat()
+                item["column"] = str(raw.get("column") or "").lower()
+            if due_day.isoformat() > str(item.get("end_date") or item["date"]):
+                item["end_date"] = due_day.isoformat()
 
+    rows = list(grouped.values())
     rows.sort(
         key=lambda item: (
             item["date"],

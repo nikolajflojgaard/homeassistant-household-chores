@@ -38,6 +38,7 @@ async def async_setup_entry(
         if not person_id:
             continue
         entities.append(PersonWeekTasksSensor(entry, board_store, person_id))
+        entities.append(NextThreeTasksPersonSensor(entry, board_store, person_id))
 
     async_add_entities(entities)
 
@@ -58,7 +59,12 @@ async def async_setup_entry(
             known_ids.add(person_id)
             missing_ids.append(person_id)
         if missing_ids:
-            async_add_entities([PersonWeekTasksSensor(entry, board_store, person_id) for person_id in missing_ids])
+            async_add_entities(
+                [
+                    *[PersonWeekTasksSensor(entry, board_store, person_id) for person_id in missing_ids],
+                    *[NextThreeTasksPersonSensor(entry, board_store, person_id) for person_id in missing_ids],
+                ]
+            )
 
     entry.async_on_unload(
         async_dispatcher_connect(
@@ -312,3 +318,82 @@ class NextThreeTasksSensor(SensorEntity):
         except Exception:  # noqa: BLE001
             board = getattr(self._board_store, "_data", None) or {}
         self._summary = next_three_tasks_summary(board, limit=3)
+
+
+class NextThreeTasksPersonSensor(SensorEntity):
+    """Sensor exposing the next three upcoming open tasks for a single person."""
+
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:format-list-checks"
+    _attr_should_poll = True
+
+    def __init__(self, entry: ConfigEntry, board_store: Any, person_id: str) -> None:
+        self._entry = entry
+        self._board_store = board_store
+        self.person_id = str(person_id)
+        self._unsub_dispatcher = None
+        self._summary: dict[str, Any] = {"count": 0, "tasks": [], "titles": []}
+        self._person_name = self.person_id
+        self._attr_unique_id = f"{entry.entry_id}_next_three_tasks_{self.person_id}"
+        self._refresh_person_fields(getattr(self._board_store, "_data", None) or {})
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to board update events."""
+        self._unsub_dispatcher = async_dispatcher_connect(
+            self.hass,
+            f"{SIGNAL_BOARD_UPDATED}_{self._entry.entry_id}",
+            self._handle_board_updated,
+        )
+        await self.async_update()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe from events."""
+        if self._unsub_dispatcher:
+            self._unsub_dispatcher()
+            self._unsub_dispatcher = None
+
+    @property
+    def name(self) -> str:
+        return f"Household Chores {self._person_name} next 3 tasks"
+
+    @property
+    def available(self) -> bool:
+        board = getattr(self._board_store, "_data", None) or {}
+        people = board.get("people", []) if isinstance(board, dict) else []
+        return any(str(person.get("id", "")) == self.person_id for person in people)
+
+    @property
+    def native_value(self) -> int:
+        return int(self._summary.get("count") or 0)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "entry_id": self._entry.entry_id,
+            "person_id": self.person_id,
+            "person_name": self._person_name,
+            "titles": list(self._summary.get("titles") or []),
+            "tasks": list(self._summary.get("tasks") or []),
+        }
+
+    def _handle_board_updated(self) -> None:
+        self.hass.async_create_task(self._async_refresh_and_write())
+
+    async def _async_refresh_and_write(self) -> None:
+        await self.async_update()
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        try:
+            board = await self._board_store.async_load()
+        except Exception:  # noqa: BLE001
+            board = getattr(self._board_store, "_data", None) or {}
+        self._refresh_person_fields(board)
+        self._summary = next_three_tasks_summary(board, limit=3, person_id=self.person_id)
+
+    def _refresh_person_fields(self, board: dict[str, Any]) -> None:
+        people = board.get("people", []) if isinstance(board, dict) else []
+        person = next((item for item in people if str(item.get("id", "")) == self.person_id), None)
+        if isinstance(person, dict):
+            name = str(person.get("name") or "").strip()
+            self._person_name = name or self.person_id
