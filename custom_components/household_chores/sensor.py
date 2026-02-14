@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .const import DEFAULT_NAME, DOMAIN, SIGNAL_BOARD_UPDATED
 from .coordinator import HouseholdChoresCoordinator
@@ -207,6 +208,11 @@ class PersonWeekTasksSensor(SensorEntity):
         return f"Household Chores {self._person_name} tasks"
 
     @property
+    def suggested_object_id(self) -> str | None:
+        # Gives stable, predictable entity_id on first creation.
+        return f"{slugify(self._person_name)}_tasks"
+
+    @property
     def available(self) -> bool:
         """Only available while person exists on board."""
         board = getattr(self._board_store, "_data", None) or {}
@@ -273,6 +279,10 @@ class NextThreeTasksSensor(SensorEntity):
         self._unsub_dispatcher = None
         self._summary: dict[str, Any] = {"count": 0, "tasks": [], "titles": []}
         self._attr_unique_id = f"{entry.entry_id}_next_three_tasks"
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        return "next_3_tasks"
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to board update events."""
@@ -355,6 +365,10 @@ class NextThreeTasksPersonSensor(SensorEntity):
     @property
     def name(self) -> str:
         return f"Household Chores {self._person_name} next 3 tasks"
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        return f"{slugify(self._person_name)}_next_3_tasks"
 
     @property
     def available(self) -> bool:

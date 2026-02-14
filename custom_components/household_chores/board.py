@@ -13,6 +13,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, SIGNAL_BOARD_UPDATED
 
+BOARD_SCHEMA_VERSION = 1
+
 WEEKDAY_COLUMNS = [
     "monday",
     "tuesday",
@@ -297,6 +299,7 @@ class HouseholdBoardStore:
             )
 
         return {
+            "schema_version": BOARD_SCHEMA_VERSION,
             "people": [asdict(person) for person in people],
             "tasks": [asdict(task) for task in tasks],
             "templates": [],
@@ -333,6 +336,12 @@ class HouseholdBoardStore:
         }
 
     def _normalize_board(self, board: dict[str, Any]) -> dict[str, Any]:
+        schema_version_raw = board.get("schema_version") if isinstance(board, dict) else None
+        try:
+            schema_version = int(schema_version_raw) if schema_version_raw is not None else 0
+        except (TypeError, ValueError):
+            schema_version = 0
+
         people = board.get("people", []) if isinstance(board, dict) else []
         tasks = board.get("tasks", []) if isinstance(board, dict) else []
         templates = board.get("templates", []) if isinstance(board, dict) else []
@@ -425,6 +434,9 @@ class HouseholdBoardStore:
             week_start = _parse_date(task.get("week_start"))
             if column in WEEKDAY_INDEX and week_start is None:
                 week_start = _week_start_for_day(dt_util.as_local(dt_util.utcnow()).date())
+            # Ensure week_start is always Monday for week-bound tasks (fixes timezone/legacy drift).
+            if column in WEEKDAY_INDEX and week_start is not None:
+                week_start = _week_start_for_day(week_start)
             week_number_raw = task.get("week_number")
             week_number = int(week_number_raw) if isinstance(week_number_raw, int) else None
             if week_number is None and week_start is not None:
@@ -494,6 +506,7 @@ class HouseholdBoardStore:
             settings["theme"] = default_settings["theme"]
 
         return {
+            "schema_version": BOARD_SCHEMA_VERSION,
             "people": normalized_people,
             "tasks": normalized_tasks,
             "templates": normalized_templates,
