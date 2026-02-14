@@ -114,6 +114,8 @@ view: next_up
 title: Household Chores
 ```
 
+Note: `Next up` is disabled by default. Enable it in the card Settings (`Show Next up badges`).
+
 If you have multiple `Household Chores` config entries, include `entry_id`:
 
 ```yaml

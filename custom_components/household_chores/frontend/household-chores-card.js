@@ -184,6 +184,7 @@ class HouseholdChoresCard extends HTMLElement {
       title: this._config?.title || "Household Chores",
       theme: "light",
       compact_mode: false,
+      show_next_up: false,
       labels: {
         done: "Completed",
         monday: "Mon",
@@ -525,6 +526,7 @@ class HouseholdChoresCard extends HTMLElement {
           ...(settings.gestures || {}),
         },
         onboarding_dismissed: Boolean(settings.onboarding_dismissed),
+        show_next_up: Boolean(settings.show_next_up),
       },
       updated_at: String(board?.updated_at || ""),
     };
@@ -1241,6 +1243,7 @@ class HouseholdChoresCard extends HTMLElement {
     const next = JSON.parse(JSON.stringify(this._settingsForm || this._defaultSettings()));
     next.theme = ["light", "dark", "colorful"].includes(next.theme) ? next.theme : "light";
     next.compact_mode = Boolean(next.compact_mode);
+    next.show_next_up = Boolean(next.show_next_up);
     next.quick_templates = Array.isArray(next.quick_templates)
       ? [...new Set(next.quick_templates.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24)
       : [];
@@ -2185,20 +2188,24 @@ class HouseholdChoresCard extends HTMLElement {
     const nextOffset = this._weekOffset + 1;
     if (nextOffset > this._maxWeekOffset) return "";
     const candidateDays = ["monday", "tuesday"];
-    const items = [];
+    let firstItem = null;
     for (const dayKey of candidateDays) {
       const dayTasks = this._tasksVisibleByFilter(this._tasksForColumn(dayKey, nextOffset))
         .filter((task) => task.column !== "done")
-        .filter((task) => !task.span_id || Number(task.span_index || 0) === 0);
-      for (const task of dayTasks) items.push({ dayKey, task });
+        .filter((task) => !task.span_id || Number(task.span_index || 0) === 0)
+        .sort((a, b) => (Number(a.order || 0) - Number(b.order || 0)) || String(a.title || "").localeCompare(String(b.title || "")));
+      if (dayTasks.length) {
+        firstItem = { dayKey, task: dayTasks[0] };
+        break;
+      }
     }
-    if (!items.length) return "";
+    if (!firstItem) return "";
     return `
       <div class="upcoming-strip" role="note">
         <span class="upcoming-label">Upcoming</span>
-        ${items
-          .slice(0, 8)
-          .map((item) => {
+        ${
+          (() => {
+            const item = firstItem;
             const people = (item.task.assignees || [])
               .map((personId) => this._board.people.find((person) => person.id === personId))
               .filter(Boolean);
@@ -2209,8 +2216,8 @@ class HouseholdChoresCard extends HTMLElement {
               .join("");
             const remaining = Math.max(0, people.length - maxDots);
             return `<span class="upcoming-pill"><strong>${this._escape(this._labelForColumn(item.dayKey))}</strong><span class="upcoming-title">${this._escape(item.task.title)}</span>${dots ? `<span class="upcoming-dots">${dots}${remaining ? `<span class="upcoming-more">+${remaining}</span>` : ""}</span>` : ""}</span>`;
-          })
-          .join("")}
+          })()
+        }
       </div>
     `;
   }
@@ -2376,6 +2383,10 @@ class HouseholdChoresCard extends HTMLElement {
                 <span>Swipe left to Delete</span>
               </label>
               <label class="settings-switch">
+                <input id="settings-show-next-up" type="checkbox" ${form.show_next_up ? "checked" : ""} />
+                <span>Show Next up badges</span>
+              </label>
+              <label class="settings-switch">
                 <input id="settings-show-onboarding" type="checkbox" ${form.onboarding_dismissed ? "" : "checked"} />
                 <span>Show onboarding tips</span>
               </label>
@@ -2449,7 +2460,8 @@ class HouseholdChoresCard extends HTMLElement {
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
     const undoHtml = this._undoState ? `<div class="undo-bar"><span>${this._escape(this._undoState.label)}</span><button id="undo-action-btn" type="button">Undo</button></div>` : "";
     const upcomingHtml = this._renderUpcomingStrip();
-    const nextUpHtml = this._renderNextUpStrip();
+    const nextUpEnabled = Boolean(this._board?.settings?.show_next_up);
+    const nextUpHtml = nextUpEnabled ? this._renderNextUpStrip() : "";
     const theme = this._themeVars();
     const compactMode = Boolean(this._board?.settings?.compact_mode);
     const weekLaneHeight = compactMode ? 320 : 360;
@@ -2707,7 +2719,7 @@ class HouseholdChoresCard extends HTMLElement {
           ${undoHtml}
           ${
             viewMode === "next_up"
-              ? `<div class="panel">${nextUpHtml || `<div class="small">No upcoming tasks</div>`}</div>`
+              ? `<div class="panel">${this._renderNextUpStrip() || `<div class="small">Enable Next up in Settings to show badges here.</div><div class="small"><button class="week-nav-btn" type="button" id="open-settings">⚙ Settings</button></div>`}</div>`
               : `
                 <div class="panel">
                   <div class="top-row ${upcomingHtml ? "has-upcoming" : ""}">
@@ -2780,6 +2792,7 @@ class HouseholdChoresCard extends HTMLElement {
     const settingsTitle = this.shadowRoot.querySelector("#settings-title");
     const settingsTheme = this.shadowRoot.querySelector("#settings-theme");
     const settingsCompactMode = this.shadowRoot.querySelector("#settings-compact-mode");
+    const settingsShowNextUp = this.shadowRoot.querySelector("#settings-show-next-up");
     const settingsShowOnboarding = this.shadowRoot.querySelector("#settings-show-onboarding");
     const settingsWeekday = this.shadowRoot.querySelector("#settings-weekday");
     const settingsRefreshHour = this.shadowRoot.querySelector("#settings-refresh-hour");
@@ -2888,6 +2901,7 @@ class HouseholdChoresCard extends HTMLElement {
     if (settingsTitle) settingsTitle.addEventListener("input", (ev) => this._onSettingsFieldInput(["title"], ev.target.value));
     if (settingsTheme) settingsTheme.addEventListener("change", (ev) => this._onSettingsFieldInput(["theme"], ev.target.value));
     if (settingsCompactMode) settingsCompactMode.addEventListener("change", (ev) => this._onSettingsFieldInput(["compact_mode"], ev.target.checked));
+    if (settingsShowNextUp) settingsShowNextUp.addEventListener("change", (ev) => this._onSettingsFieldInput(["show_next_up"], ev.target.checked));
     if (settingsShowOnboarding) settingsShowOnboarding.addEventListener("change", (ev) => this._onSettingsFieldInput(["onboarding_dismissed"], !ev.target.checked));
     if (settingsWeekday) settingsWeekday.addEventListener("change", (ev) => this._onSettingsFieldInput(["weekly_refresh", "weekday"], Number(ev.target.value)));
     if (settingsRefreshHour) settingsRefreshHour.addEventListener("input", (ev) => this._onSettingsFieldInput(["weekly_refresh", "hour"], Number(ev.target.value)));
