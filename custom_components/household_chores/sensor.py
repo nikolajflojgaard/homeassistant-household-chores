@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -17,6 +19,92 @@ from homeassistant.util import slugify
 from .const import DEFAULT_NAME, DOMAIN, SIGNAL_BOARD_UPDATED
 from .coordinator import HouseholdChoresCoordinator
 from .stats import next_three_tasks_summary, person_week_stats
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _ensure_unique_entity_id(registry: er.EntityRegistry, wanted: str, current: str) -> str:
+    """Return a unique entity_id (sensor.<object_id>) in the registry."""
+    if wanted == current:
+        return current
+    if registry.async_get(wanted) is None:
+        return wanted
+    base = wanted
+    if "_" in base:
+        base = base
+    idx = 2
+    while True:
+        candidate = f"{base}_{idx}"
+        if registry.async_get(candidate) is None:
+            return candidate
+        idx += 1
+
+
+async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry, board: dict[str, Any]) -> None:
+    """Migrate legacy sensor entity_ids to the documented household_chores_* names.
+
+    This runs best-effort and logs what it changes.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    done: set[str] = domain_data.setdefault("entity_migrations_done", set())
+    if entry.entry_id in done:
+        return
+
+    registry = er.async_get(hass)
+    reg_entries = er.async_entries_for_config_entry(registry, entry.entry_id)
+    if not reg_entries:
+        done.add(entry.entry_id)
+        return
+
+    people = board.get("people", []) if isinstance(board, dict) else []
+    name_by_id = {
+        str(person.get("id", "")).strip(): str(person.get("name", "")).strip()
+        for person in people
+        if isinstance(person, dict) and str(person.get("id", "")).strip()
+    }
+
+    migrations: list[tuple[str, str]] = []
+    for reg_entry in reg_entries:
+        if reg_entry.domain != "sensor":
+            continue
+        unique_id = str(reg_entry.unique_id or "")
+        current_entity_id = reg_entry.entity_id
+
+        wanted: str | None = None
+
+        if unique_id == f"{entry.entry_id}_next_three_tasks":
+            wanted = "sensor.household_chores_next_3_tasks"
+        elif unique_id.startswith(f"{entry.entry_id}_person_week_"):
+            person_id = unique_id.removeprefix(f"{entry.entry_id}_person_week_")
+            person_name = name_by_id.get(person_id, "").strip()
+            if person_name:
+                wanted = f"sensor.household_chores_{slugify(person_name)}_tasks"
+        elif unique_id.startswith(f"{entry.entry_id}_next_three_tasks_"):
+            person_id = unique_id.removeprefix(f"{entry.entry_id}_next_three_tasks_")
+            person_name = name_by_id.get(person_id, "").strip()
+            if person_name:
+                wanted = f"sensor.household_chores_{slugify(person_name)}_next_3_tasks"
+
+        if not wanted:
+            continue
+        if current_entity_id == wanted:
+            continue
+        # Skip if current already has the desired prefix and looks fine.
+        if current_entity_id.startswith("sensor.household_chores_") and wanted.startswith("sensor.household_chores_"):
+            continue
+
+        wanted_unique = _ensure_unique_entity_id(registry, wanted, current_entity_id)
+        if wanted_unique != current_entity_id:
+            try:
+                registry.async_update_entity(current_entity_id, new_entity_id=wanted_unique)
+                migrations.append((current_entity_id, wanted_unique))
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Entity migration failed for %s -> %s: %s", current_entity_id, wanted_unique, err)
+
+    if migrations:
+        _LOGGER.info("Household Chores migrated %d sensor entity_id(s): %s", len(migrations), migrations)
+
+    done.add(entry.entry_id)
 
 
 async def async_setup_entry(
@@ -34,6 +122,7 @@ async def async_setup_entry(
     ]
 
     board = await board_store.async_load()
+    await _async_migrate_entity_ids(hass, entry, board)
     for person in board.get("people", []):
         person_id = str(person.get("id") or "").strip()
         if not person_id:

@@ -2193,7 +2193,7 @@ class HouseholdChoresCard extends HTMLElement {
     `;
   }
 
-  _renderUpcomingStrip() {
+  _renderUpcomingStrip(excludeTaskId = "") {
     const nextOffset = this._weekOffset + 1;
     if (nextOffset > this._maxWeekOffset) return "";
     const candidateDays = ["monday", "tuesday"];
@@ -2209,6 +2209,7 @@ class HouseholdChoresCard extends HTMLElement {
       }
     }
     if (!firstItem) return "";
+    if (excludeTaskId && String(firstItem.task?.id || "") === String(excludeTaskId)) return "";
     return `
       <div class="upcoming-strip" role="note">
         <span class="upcoming-label">Upcoming</span>
@@ -2485,8 +2486,9 @@ class HouseholdChoresCard extends HTMLElement {
     const loadingHtml = this._loading ? `<div class="loading">Loading board...</div>` : "";
     const errorHtml = this._error ? `<div class="error">${this._escape(this._error)}</div>` : "";
     const undoHtml = this._undoState ? `<div class="undo-bar"><span>${this._escape(this._undoState.label)}</span><button id="undo-action-btn" type="button">Undo</button></div>` : "";
-    const upcomingHtml = this._board?.settings?.show_upcoming ? this._renderUpcomingStrip() : "";
     const nextUpEnabled = Boolean(this._board?.settings?.show_next_up);
+    const nextUpFirstId = nextUpEnabled ? (this._nextUpItems(1)[0]?.task?.id || "") : "";
+    const upcomingHtml = this._board?.settings?.show_upcoming ? this._renderUpcomingStrip(nextUpFirstId) : "";
     const nextUpHtml = nextUpEnabled ? this._renderNextUpStrip() : "";
     const theme = this._themeVars();
     const compactMode = Boolean(this._board?.settings?.compact_mode);
