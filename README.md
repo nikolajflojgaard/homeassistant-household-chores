@@ -151,6 +151,11 @@ The screenshots below are updated with each UI/layout release.
 
 ## Notes
 
+- Entity ID migration (sensors):
+  - Older installs might have legacy IDs like `sensor.next_3_tasks`.
+  - From `v0.3.89+`, the integration attempts a best-effort rename to `sensor.household_chores_*` on startup.
+  - After updating + restarting Home Assistant, check logs for: `Household Chores migrated ...`
+
 - The custom card JavaScript is auto-registered by the integration at startup.
 - Repository includes icon/logo fallback files (`icon.png`, `logo.png`, `dark_icon.png`, `dark_logo.png`) for broader HACS/UI icon compatibility.
 - JS resource is auto versioned (`?v=<manifest version>`) to reduce browser cache issues after updates.
