@@ -138,7 +138,7 @@ In Home Assistant:
 
 ## Screenshots
 
-The screenshots below are updated with each UI/layout release.
+Current UI captures from the latest tablet/compact board layout.
 
 ### Tablet overview
 ![Tablet weekly board](docs/screenshots/weekly-board-tablet.png)
