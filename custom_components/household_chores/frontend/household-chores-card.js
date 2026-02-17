@@ -1182,7 +1182,8 @@ class HouseholdChoresCard extends HTMLElement {
   _onTaskTouchStart(taskEl, ev) {
     if (!ev.touches || ev.touches.length !== 1) return;
     const isVirtual = taskEl.dataset.virtual === "1";
-    if (isVirtual) return;
+    const isCollapsed = taskEl.dataset.collapsed === "1";
+    if (isVirtual || isCollapsed) return;
     this._blockWeekSwipeUntil = Date.now() + 900;
     taskEl.classList.remove("swipe-complete-preview", "swipe-delete-preview");
     this._taskSwipe = {
@@ -1963,8 +1964,38 @@ class HouseholdChoresCard extends HTMLElement {
     return bits.length ? `<div class="task-sub">${this._escape(bits.join(" • "))}</div>` : "";
   }
 
+  _collapsedCompletedTasks(tasks) {
+    const grouped = new Map();
+    const personOrder = new Map(this._board.people.map((person, idx) => [String(person.id), idx]));
+
+    for (const task of tasks) {
+      const key = String(task.title || "").trim().toLowerCase();
+      if (!key) continue;
+
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          ...task,
+          _collapsedCount: 1,
+          _collapsedIds: [task.id],
+        });
+        continue;
+      }
+
+      existing._collapsedCount += 1;
+      existing._collapsedIds.push(task.id);
+      const mergedAssignees = [...new Set([...(existing.assignees || []), ...(task.assignees || [])])];
+      mergedAssignees.sort((a, b) => (personOrder.get(String(a)) ?? 9999) - (personOrder.get(String(b)) ?? 9999));
+      existing.assignees = mergedAssignees;
+    }
+
+    return [...grouped.values()];
+  }
+
   _renderTaskCard(task) {
-    const draggable = !task.virtual && !task.span_id;
+    const collapsedCount = Number(task._collapsedCount || 1);
+    const isCollapsed = collapsedCount > 1;
+    const draggable = !task.virtual && !task.span_id && !isCollapsed;
     const isCompleted = String(task.column || "").toLowerCase() === "done";
     const isSpan = Boolean(task.span_id);
     const isSpanStart = isSpan && Number(task.span_index) === 0;
@@ -1978,9 +2009,10 @@ class HouseholdChoresCard extends HTMLElement {
       ? ""
       : ` style="--task-bg:${cardColors.bg};--task-border:${cardColors.border};--task-text:${cardColors.text};--task-accent:${cardColors.accent};"`;
     return `
-      <article class="task ${task.virtual ? "virtual-task" : ""} ${task.fixed ? "fixed-task" : ""} ${isCompleted ? "completed-compact" : ""}${spanClass}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-template-id="${task.template_id || ""}" data-column="${task.column || ""}" data-virtual="${task.virtual ? "1" : "0"}"${cardStyle}>
+      <article class="task ${task.virtual ? "virtual-task" : ""} ${task.fixed ? "fixed-task" : ""} ${isCompleted ? "completed-compact" : ""} ${isCollapsed ? "collapsed-group" : ""}${spanClass}" draggable="${draggable ? "true" : "false"}" data-task-id="${task.id}" data-template-id="${task.template_id || ""}" data-column="${task.column || ""}" data-virtual="${task.virtual ? "1" : "0"}" data-collapsed="${isCollapsed ? "1" : "0"}"${cardStyle}>
         <div class="task-head">
           <div class="task-title">${showContent ? this._escape(task.title) : "&nbsp;"}</div>
+          ${showContent && isCollapsed ? `<span class="task-repeat-count">x${collapsedCount}</span>` : ""}
         </div>
         ${showContent ? this._taskMetaLine(task) : ""}
         ${showContent ? `<div class="task-meta">${this._assigneeChips(task)}</div>` : ""}
@@ -2095,7 +2127,9 @@ class HouseholdChoresCard extends HTMLElement {
   _renderColumn(column) {
     let tasks = this._tasksVisibleByFilter(this._tasksForColumn(column.key));
     if (column.key !== "done") tasks = tasks.filter((task) => !task.span_id);
+    const totalTaskCount = tasks.length;
     const isSideLane = column.key === "done";
+    if (isSideLane) tasks = this._collapsedCompletedTasks(tasks);
     const isWeekday = this._weekdayKeys().some((day) => day.key === column.key);
     const isTodayColumn = isWeekday && this._weekOffset === 0 && column.key === this._todayWeekdayKey();
     const weekdayDate = isWeekday ? this._formatWeekdayDateCompact(column.key) : "";
@@ -2113,7 +2147,7 @@ class HouseholdChoresCard extends HTMLElement {
         <header class="column-head">
           <div class="column-title-row">
             <h3>${this._escape(this._labelForColumn(column.key))}</h3>
-            <span class="column-meta">${isTodayColumn ? '<span class="today-pill">Today</span>' : ""}<span class="col-count">${tasks.length}</span></span>
+            <span class="column-meta">${isTodayColumn ? '<span class="today-pill">Today</span>' : ""}<span class="col-count">${totalTaskCount}</span></span>
           </div>
           ${weekdayDate ? `<div class="col-date">${this._escape(weekdayDate)}</div>` : ""}
         </header>
@@ -2622,6 +2656,7 @@ class HouseholdChoresCard extends HTMLElement {
         .col-date{font-size:.68rem;color:#94a3b8;margin-top:2px}
         .tasks{display:grid;gap:6px;align-content:start}
         .task{background:var(--task-bg,#f8fafc);border:1px solid var(--task-border,#e2e8f0);color:var(--task-text,#0f172a);border-radius:10px;padding:7px;cursor:grab;user-select:none}
+        .task.collapsed-group{cursor:default}
         .task.virtual-task{cursor:default;opacity:.96}
         .task.fixed-task{background:var(--task-bg,#ecf3ff);border-color:var(--task-border,#b7cdf3);box-shadow:inset 3px 0 0 var(--task-accent,#3b82f6)}
         .task.span-task{
@@ -2663,6 +2698,19 @@ class HouseholdChoresCard extends HTMLElement {
           display:-webkit-box;
           -webkit-line-clamp:2;
           -webkit-box-orient:vertical;
+        }
+        .task-repeat-count{
+          flex:0 0 auto;
+          align-self:flex-start;
+          font-size:.68rem;
+          line-height:1;
+          font-weight:800;
+          color:#334155;
+          background:#e2e8f0;
+          border:1px solid #cbd5e1;
+          border-radius:999px;
+          padding:3px 6px;
+          letter-spacing:.02em;
         }
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
         .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
@@ -3028,10 +3076,11 @@ class HouseholdChoresCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll(".task").forEach((taskEl) => {
       const isVirtual = taskEl.dataset.virtual === "1";
+      const isCollapsed = taskEl.dataset.collapsed === "1";
       const taskId = taskEl.dataset.taskId;
       const templateId = taskEl.dataset.templateId || "";
       const taskColumn = taskEl.dataset.column || "monday";
-      if (!this._isReadOnlyWeekView() && !isVirtual) {
+      if (!this._isReadOnlyWeekView() && !isVirtual && !isCollapsed) {
         taskEl.addEventListener("dragstart", (ev) => {
           this._draggingTask = true;
           ev.dataTransfer.effectAllowed = "move";
@@ -3066,10 +3115,12 @@ class HouseholdChoresCard extends HTMLElement {
       }, { passive: true });
 
       taskEl.addEventListener("dragover", (ev) => {
+        if (isCollapsed) return;
         if (ev.dataTransfer.types.includes("text/person")) ev.preventDefault();
       });
 
       taskEl.addEventListener("drop", async (ev) => {
+        if (isCollapsed) return;
         const personId = ev.dataTransfer.getData("text/person-assignment") || ev.dataTransfer.getData("text/person");
         const sourceTaskId = ev.dataTransfer.getData("text/source-task");
         if (!personId) return;
