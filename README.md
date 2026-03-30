@@ -85,6 +85,9 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - `household_chores.get_person_tasks`
   - `household_chores.get_week_summary`
   - `household_chores.create_task`
+  - `household_chores.update_task`
+  - `household_chores.delete_task`
+  - `household_chores.list_tasks`
 
 ## Install (HACS)
 
@@ -191,3 +194,12 @@ Use Home Assistant service calls with response data enabled:
   - if exactly one Household Chores board exists, `entry_id` is auto-resolved
   - assignee names are resolved against board people by name (case-insensitive)
   - output includes created `task`, resolved assignees, and unknown assignee names
+- `household_chores.update_task`
+  - input: optional `entry_id`, match via `task_id` or `title` + optional `date` + optional assignees, then update with `new_title`, `new_date`, `new_assignees[]`, `new_assignee_names[]`
+  - returns `task_ambiguous` if multiple tasks match instead of guessing
+- `household_chores.delete_task`
+  - input: optional `entry_id`, match via `task_id` or `title` + optional `date` + optional assignees
+  - returns the deleted task, or `task_ambiguous` if multiple tasks match
+- `household_chores.list_tasks`
+  - input: optional `entry_id`, optional filters `title`, `date`, `assignees[]`, `assignee_names[]`, optional `include_done`, optional `limit`
+  - returns task summaries with ids, dates, columns, and assignee names for lookup/use in chat flows
