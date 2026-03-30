@@ -40,7 +40,7 @@ _GET_WEEK_SUMMARY_SCHEMA = vol.Schema(
 )
 _CREATE_TASK_SCHEMA = vol.Schema(
     {
-        vol.Required("entry_id"): str,
+        vol.Optional("entry_id"): str,
         vol.Required("title"): vol.All(str, vol.Length(min=1)),
         vol.Optional("date"): str,
         vol.Optional("assignees"): [str],
@@ -96,7 +96,9 @@ async def async_register(hass: HomeAssistant) -> None:
         }
 
     async def _async_create_task(call: ServiceCall) -> ServiceResponse:
-        entry_id = call.data["entry_id"]
+        entry_id = _resolve_entry_id(hass, call.data.get("entry_id"))
+        if entry_id is None:
+            return {"ok": False, "error": "entry_id_required_or_ambiguous"}
         board_store = hass.data.get(DOMAIN, {}).get("boards", {}).get(entry_id)
         if board_store is None:
             return {"ok": False, "error": f"entry_not_found: {entry_id}"}
@@ -227,3 +229,15 @@ def _parse_date(value: Any) -> date | None:
 def _week_start_for_day(day_value: date) -> date:
     """Return Monday date for ISO week containing the given date."""
     return day_value - timedelta(days=day_value.weekday())
+
+
+def _resolve_entry_id(hass: HomeAssistant, entry_id: Any) -> str | None:
+    """Resolve explicit entry_id or auto-select the only board entry."""
+    if entry_id is not None:
+        raw = str(entry_id).strip()
+        if raw:
+            return raw
+    boards = hass.data.get(DOMAIN, {}).get("boards", {})
+    if isinstance(boards, dict) and len(boards) == 1:
+        return next(iter(boards))
+    return None

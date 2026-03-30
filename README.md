@@ -187,6 +187,7 @@ Use Home Assistant service calls with response data enabled:
   - input: `entry_id`, optional `week_offset` (`0..3`)
   - output includes `people[]` summaries + `totals`
 - `household_chores.create_task`
-  - input: `entry_id`, `title`, optional `date` (`YYYY-MM-DD`), optional `assignees[]`, optional `assignee_names[]`
+  - input: optional `entry_id`, required `title`, optional `date` (`YYYY-MM-DD`), optional `assignees[]`, optional `assignee_names[]`
+  - if exactly one Household Chores board exists, `entry_id` is auto-resolved
   - assignee names are resolved against board people by name (case-insensitive)
   - output includes created `task`, resolved assignees, and unknown assignee names
