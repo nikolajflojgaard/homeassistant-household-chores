@@ -84,6 +84,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Response services for dashboards/automations:
   - `household_chores.get_person_tasks`
   - `household_chores.get_week_summary`
+  - `household_chores.create_task`
 
 ## Install (HACS)
 
@@ -185,3 +186,7 @@ Use Home Assistant service calls with response data enabled:
 - `household_chores.get_week_summary`
   - input: `entry_id`, optional `week_offset` (`0..3`)
   - output includes `people[]` summaries + `totals`
+- `household_chores.create_task`
+  - input: `entry_id`, `title`, optional `date` (`YYYY-MM-DD`), optional `assignees[]`, optional `assignee_names[]`
+  - assignee names are resolved against board people by name (case-insensitive)
+  - output includes created `task`, resolved assignees, and unknown assignee names
