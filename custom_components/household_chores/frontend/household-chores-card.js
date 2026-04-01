@@ -2006,6 +2006,42 @@ class HouseholdChoresCard extends HTMLElement {
     return bits.length ? `<div class="task-sub">${this._escape(bits.join(" • "))}</div>` : "";
   }
 
+  _timingBadges(task) {
+    if (task.virtual) return "";
+    const current = String(task.slot || "").toLowerCase();
+    return `
+      <div class="timing-badges">
+        <button type="button" class="timing-badge ${current === "am" ? "active" : ""}" data-task-slot="am" data-task-id="${task.id}">AM</button>
+        <button type="button" class="timing-badge ${current === "pm" ? "active" : ""}" data-task-slot="pm" data-task-id="${task.id}">PM</button>
+      </div>
+    `;
+  }
+
+  _setTaskSlot(taskId, slot) {
+    const targetTask = this._board.tasks.find((task) => task.id === taskId);
+    if (!targetTask) return;
+    const normalized = slot === "am" || slot === "pm" ? slot : "";
+
+    if (targetTask.template_id) {
+      const tpl = this._board.templates.find((item) => item.id === targetTask.template_id);
+      if (tpl) tpl.slot = normalized;
+      this._board.tasks.forEach((task) => {
+        if (task.template_id === targetTask.template_id) task.slot = normalized;
+      });
+      return;
+    }
+
+    if (targetTask.span_id) {
+      const spanGroup = this._taskSpanGroup(targetTask);
+      spanGroup.forEach((task) => {
+        task.slot = normalized;
+      });
+      return;
+    }
+
+    targetTask.slot = normalized;
+  }
+
   _collapsedCompletedTasks(tasks) {
     const grouped = new Map();
     const personOrder = new Map(this._board.people.map((person, idx) => [String(person.id), idx]));
@@ -2057,7 +2093,7 @@ class HouseholdChoresCard extends HTMLElement {
           ${showContent && isCollapsed ? `<span class="task-repeat-count">x${collapsedCount}</span>` : ""}
         </div>
         ${showContent ? this._taskMetaLine(task) : ""}
-        ${showContent ? `<div class="task-meta">${this._assigneeChips(task)}</div>` : ""}
+        ${showContent ? `<div class="task-meta">${this._timingBadges(task)}${this._assigneeChips(task)}</div>` : ""}
       </article>
     `;
   }
@@ -2762,7 +2798,10 @@ class HouseholdChoresCard extends HTMLElement {
           letter-spacing:.02em;
         }
         .task-sub{margin-top:4px;color:#64748b;font-size:.73rem}
-        .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+        .task-meta{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+        .timing-badges{display:inline-flex;gap:4px;align-items:center}
+        .timing-badge{height:24px;min-width:32px;padding:0 8px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:.7rem;font-weight:800;letter-spacing:.03em}
+        .timing-badge.active{background:#0f766e;color:#fff;border-color:#0f766e}
         .task .chip{width:19px;height:19px;font-size:.66rem}
         .span-day-pad{width:100%}
         .empty-wrap{display:grid;gap:6px;align-content:start}
@@ -3112,6 +3151,22 @@ class HouseholdChoresCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll("input[name='assignee']").forEach((cb) => {
       cb.addEventListener("change", () => this._toggleTaskAssignee(cb.value));
+    });
+
+    this.shadowRoot.querySelectorAll("[data-task-slot]").forEach((el) => {
+      el.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const taskId = el.dataset.taskId || "";
+        const slot = el.dataset.taskSlot || "";
+        const task = this._board.tasks.find((item) => item.id === taskId);
+        if (!task || task.virtual) return;
+        const snapshot = this._snapshotBoard();
+        const current = String(task.slot || "").toLowerCase();
+        this._setTaskSlot(taskId, current === slot ? "" : slot);
+        this._setUndo(`Task timing updated`, snapshot);
+        this._render();
+        await this._saveBoard();
+      });
     });
 
     this.shadowRoot.querySelectorAll("[data-person-id]").forEach((el) => {
