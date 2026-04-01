@@ -46,7 +46,7 @@ _CREATE_TASK_SCHEMA = vol.Schema(
         vol.Optional("entry_id"): str,
         vol.Required("title"): vol.All(str, vol.Length(min=1)),
         vol.Optional("date"): str,
-        vol.Optional("slot"): vol.In(["morning", "afternoon", "evening"]),
+        vol.Optional("slot"): vol.In(["am", "pm"]),
         vol.Optional("assignees"): [str],
         vol.Optional("assignee_names"): [str],
     }
@@ -61,7 +61,7 @@ _UPDATE_TASK_SCHEMA = vol.Schema(
         vol.Optional("assignee_names"): [str],
         vol.Optional("new_title"): str,
         vol.Optional("new_date"): str,
-        vol.Optional("new_slot"): vol.In(["morning", "afternoon", "evening"]),
+        vol.Optional("new_slot"): vol.In(["am", "pm"]),
         vol.Optional("new_assignees"): [str],
         vol.Optional("new_assignee_names"): [str],
     }

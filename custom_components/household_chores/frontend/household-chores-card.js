@@ -868,20 +868,6 @@ class HouseholdChoresCard extends HTMLElement {
     return stored;
   }
 
-  _tasksForColumnAndSlot(column, slot = "", weekOffset = this._weekOffset) {
-    const normalizedSlot = String(slot || "").trim().toLowerCase();
-    return this._tasksForColumn(column, weekOffset).filter((task) => String(task.slot || "").trim().toLowerCase() === normalizedSlot);
-  }
-
-  _slotSections() {
-    return [
-      { key: "morning", label: "Morning" },
-      { key: "afternoon", label: "Afternoon" },
-      { key: "evening", label: "Evening" },
-      { key: "", label: "Any time" },
-    ];
-  }
-
   _projectedTasksForFutureWeekday(weekdayKey, weekOffset) {
     const dayDate = this._weekdayDateForWeek(weekdayKey, weekOffset);
     if (!dayDate) return [];
@@ -2006,6 +1992,8 @@ class HouseholdChoresCard extends HTMLElement {
   _taskMetaLine(task) {
     if (task.fixed || task.span_id) return "";
     const bits = [];
+    const slot = String(task.slot || "").toLowerCase();
+    if (slot === "am" || slot === "pm") bits.push(slot.toUpperCase());
     if (task.end_date) bits.push(`until ${task.end_date}`);
     return bits.length ? `<div class="task-sub">${this._escape(bits.join(" • "))}</div>` : "";
   }
@@ -2188,21 +2176,6 @@ class HouseholdChoresCard extends HTMLElement {
         <div class="empty"><div class="empty-title">${emptyTitle}</div><div class="empty-sub">${emptySub}</div></div>
       </div>
     `;
-
-    const slotSections = isWeekday && !isSideLane
-      ? this._slotSections().map((slot) => {
-          const slotTasks = this._tasksVisibleByFilter(this._tasksForColumnAndSlot(column.key, slot.key));
-          return `
-            <div class="slot-lane" data-column="${column.key}" data-slot="${slot.key}">
-              <div class="slot-lane-head">${this._escape(slot.label)} <span class="slot-lane-count">${slotTasks.length}</span></div>
-              <div class="slot-lane-body">
-                ${slotTasks.length ? slotTasks.map((task) => this._renderTaskCard(task)).join("") : `<div class="slot-empty">Drop or add</div>`}
-              </div>
-            </div>
-          `;
-        }).join("")
-      : "";
-
     return `
       <section class="column ${isSideLane ? "side-lane" : "week-lane"} ${isTodayColumn ? "today-col" : ""}" data-column="${column.key}">
         <header class="column-head">
@@ -2214,7 +2187,7 @@ class HouseholdChoresCard extends HTMLElement {
         </header>
         <div class="tasks">
           ${daySpanPad}
-          ${isWeekday && !isSideLane ? slotSections : (tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent)}
+          ${tasks.length ? tasks.map((task) => this._renderTaskCard(task)).join("") : emptyContent}
         </div>
       </section>
     `;
@@ -2384,10 +2357,9 @@ class HouseholdChoresCard extends HTMLElement {
             <div class="task-grid-two">
               ${showWeekdayMode ? "" : `<select id="task-column">${this._columns().map((c) => `<option value="${c.key}" ${form.column === c.key ? "selected" : ""}>${this._escape(this._labelForColumn(c.key))}</option>`).join("")}</select>`}
               <select id="task-slot">
-                <option value="" ${!form.slot ? "selected" : ""}>Any time</option>
-                <option value="morning" ${form.slot === "morning" ? "selected" : ""}>Morning</option>
-                <option value="afternoon" ${form.slot === "afternoon" ? "selected" : ""}>Afternoon</option>
-                <option value="evening" ${form.slot === "evening" ? "selected" : ""}>Evening</option>
+                <option value="" ${!form.slot ? "selected" : ""}>No time badge</option>
+                <option value="am" ${form.slot === "am" ? "selected" : ""}>AM</option>
+                <option value="pm" ${form.slot === "pm" ? "selected" : ""}>PM</option>
               </select>
             </div>
             <div class="assignees">
@@ -2817,12 +2789,7 @@ class HouseholdChoresCard extends HTMLElement {
         .weekday-dot{width:28px;height:28px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;padding:0;font-size:.76rem;font-weight:700}
         .weekday-dot.sel{background:#0f766e;border-color:#0f766e;color:#fff}
         .task-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-        .slot-lane{border:1px solid #dbe3ef;border-radius:12px;padding:8px;background:#f8fafc;margin-bottom:8px}
-        .slot-lane-head{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
-        .slot-lane-count{color:#64748b;font-size:.75rem}
-        .slot-lane-body{display:grid;gap:8px;min-height:40px}
-        .slot-empty{font-size:.76rem;color:#94a3b8;padding:6px 2px}
-        .assignees{display:flex;flex-wrap:wrap;gap:8px}
+                                                .assignees{display:flex;flex-wrap:wrap;gap:8px}
         .assignees label{display:flex;align-items:center;gap:5px;font-size:.78rem}
         .modal-actions{display:flex;justify-content:space-between;gap:8px}
         .delete-series{display:flex;align-items:center;gap:6px;font-size:.8rem;color:#334155}
@@ -3248,17 +3215,13 @@ class HouseholdChoresCard extends HTMLElement {
 
         const task = this._board.tasks.find((t) => t.id === taskId);
         if (!task) return;
-        const slotHost = ev.target.closest("[data-slot]");
-        const targetSlot = slotHost ? String(slotHost.dataset.slot || "") : "";
-        if (task.column === columnKey && String(task.slot || "") === targetSlot) return;
+        if (task.column === columnKey) return;
         const snapshot = this._snapshotBoard();
         task.column = columnKey;
-        task.slot = targetSlot;
         task.week_start = this._weekStartIso(this._weekOffset);
         task.week_number = this._weekNumberForOffset(this._weekOffset);
         this._reindexAllColumns();
-        const slotLabel = targetSlot ? ` (${targetSlot})` : "";
-        this._setUndo(`Task moved to ${this._labelForColumn(columnKey)}${slotLabel}`, snapshot);
+        this._setUndo(`Task moved to ${this._labelForColumn(columnKey)}`, snapshot);
         this._render();
         await this._saveBoard();
       });

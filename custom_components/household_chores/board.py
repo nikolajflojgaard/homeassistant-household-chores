@@ -429,7 +429,7 @@ class HouseholdBoardStore:
             order = int(task.get("order", index))
             created_at = str(task.get("created_at") or datetime.now(UTC).isoformat())
             slot_raw = str(task.get("slot") or "").strip().lower()
-            slot = slot_raw if slot_raw in {"morning", "afternoon", "evening"} else None
+            slot = slot_raw if slot_raw in {"am", "pm"} else None
             end_date = _parse_date(task.get("end_date"))
             template_id = str(task.get("template_id")) if task.get("template_id") else None
             fixed = bool(task.get("fixed", False))
