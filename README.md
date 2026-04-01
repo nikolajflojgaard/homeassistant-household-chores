@@ -85,6 +85,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Tasks expose direct clickable `AM` / `PM` chips on the card, with only one active at a time
 - Timing remains task metadata rather than a split-lane layout, and saved board state is now returned consistently from both websocket and service save paths
 - Downstream task summaries now preserve `slot` too, so AM/PM timing does not disappear when board-derived sensor payloads refresh
+- Frontend board normalization now preserves task/template `slot` too, instead of stripping AM/PM timing during refresh/merge cycles
 - AM/PM badges are preserved across single tasks, weekday-generated tasks, fixed tasks, and all-day span task creation/edit flows
 - Weekday lanes stay simple; timing is shown as a badge on the task instead of splitting each day into sub-lanes
 - Response services for dashboards/automations:
