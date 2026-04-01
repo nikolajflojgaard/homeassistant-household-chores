@@ -9,6 +9,7 @@ from uuid import uuid4
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from .board import BoardConflictError
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
@@ -26,6 +27,7 @@ _SAVE_SCHEMA = vol.Schema(
     {
         vol.Required("entry_id"): str,
         vol.Required("board"): dict,
+        vol.Optional("expected_updated_at"): str,
     }
 )
 _GET_PERSON_TASKS_SCHEMA = vol.Schema(
@@ -92,13 +94,20 @@ _LIST_TASKS_SCHEMA = vol.Schema(
 async def async_register(hass: HomeAssistant) -> None:
     """Register integration services."""
 
-    async def _async_save_board(call: ServiceCall) -> None:
+    async def _async_save_board(call: ServiceCall) -> ServiceResponse:
         entry_id = call.data["entry_id"]
         board = call.data["board"]
         board_store = hass.data.get(DOMAIN, {}).get("boards", {}).get(entry_id)
         if board_store is None:
-            return
-        await board_store.async_save(board)
+            return {"ok": False, "error": f"entry_not_found: {entry_id}"}
+        try:
+            saved = await board_store.async_save(
+                board,
+                expected_updated_at=call.data.get("expected_updated_at"),
+            )
+        except BoardConflictError as err:
+            return {"ok": False, "error": f"conflict: {err}"}
+        return {"ok": True, "entry_id": entry_id, "board": saved}
 
     async def _async_get_person_tasks(call: ServiceCall) -> ServiceResponse:
         entry_id = call.data["entry_id"]
@@ -359,6 +368,7 @@ async def async_register(hass: HomeAssistant) -> None:
             SERVICE_SAVE_BOARD,
             _async_save_board,
             schema=_SAVE_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
     if not hass.services.has_service(DOMAIN, SERVICE_GET_PERSON_TASKS):
         hass.services.async_register(

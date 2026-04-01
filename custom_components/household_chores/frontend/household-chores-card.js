@@ -2007,39 +2007,9 @@ class HouseholdChoresCard extends HTMLElement {
   }
 
   _timingBadges(task) {
-    if (task.virtual) return "";
     const current = String(task.slot || "").toLowerCase();
-    return `
-      <div class="timing-badges">
-        <button type="button" class="timing-badge ${current === "am" ? "active" : ""}" data-task-slot="am" data-task-id="${task.id}">AM</button>
-        <button type="button" class="timing-badge ${current === "pm" ? "active" : ""}" data-task-slot="pm" data-task-id="${task.id}">PM</button>
-      </div>
-    `;
-  }
-
-  _setTaskSlot(taskId, slot) {
-    const targetTask = this._board.tasks.find((task) => task.id === taskId);
-    if (!targetTask) return;
-    const normalized = slot === "am" || slot === "pm" ? slot : "";
-
-    if (targetTask.template_id) {
-      const tpl = this._board.templates.find((item) => item.id === targetTask.template_id);
-      if (tpl) tpl.slot = normalized;
-      this._board.tasks.forEach((task) => {
-        if (task.template_id === targetTask.template_id) task.slot = normalized;
-      });
-      return;
-    }
-
-    if (targetTask.span_id) {
-      const spanGroup = this._taskSpanGroup(targetTask);
-      spanGroup.forEach((task) => {
-        task.slot = normalized;
-      });
-      return;
-    }
-
-    targetTask.slot = normalized;
+    if (current !== "am" && current !== "pm") return "";
+    return `<span class="timing-badge active">${current.toUpperCase()}</span>`;
   }
 
   _collapsedCompletedTasks(tasks) {
@@ -3151,22 +3121,6 @@ class HouseholdChoresCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll("input[name='assignee']").forEach((cb) => {
       cb.addEventListener("change", () => this._toggleTaskAssignee(cb.value));
-    });
-
-    this.shadowRoot.querySelectorAll("[data-task-slot]").forEach((el) => {
-      el.addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        const taskId = el.dataset.taskId || "";
-        const slot = el.dataset.taskSlot || "";
-        const task = this._board.tasks.find((item) => item.id === taskId);
-        if (!task || task.virtual) return;
-        const snapshot = this._snapshotBoard();
-        const current = String(task.slot || "").toLowerCase();
-        this._setTaskSlot(taskId, current === slot ? "" : slot);
-        this._setUndo(`Task timing updated`, snapshot);
-        this._render();
-        await this._saveBoard();
-      });
     });
 
     this.shadowRoot.querySelectorAll("[data-person-id]").forEach((el) => {
