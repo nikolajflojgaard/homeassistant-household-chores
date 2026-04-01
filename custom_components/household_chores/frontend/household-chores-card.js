@@ -1597,7 +1597,7 @@ class HouseholdChoresCard extends HTMLElement {
     );
   }
 
-  _buildFixedInstancesForCurrentWeek(template, title, assignees) {
+  _buildFixedInstancesForCurrentWeek(template, title, assignees, slot = "") {
     const todayIso = this._todayIsoDate();
     const weekStart = this._weekStartIso(0);
     const weekNumber = this._weekNumberForOffset(0);
@@ -1616,6 +1616,7 @@ class HouseholdChoresCard extends HTMLElement {
         column: dayKey,
         order: 0,
         created_at: new Date().toISOString(),
+        slot: slot || template.slot || "",
         end_date: template.end_date,
         template_id: template.id,
         fixed: true,
@@ -1634,6 +1635,7 @@ class HouseholdChoresCard extends HTMLElement {
     assignees,
     weekdays,
     endDate = "",
+    slot = "",
     weekStart = this._weekStartIso(this._weekOffset),
     weekNumber = this._weekNumberForOffset(this._weekOffset)
   ) {
@@ -1646,6 +1648,7 @@ class HouseholdChoresCard extends HTMLElement {
         column: dayKey,
         order: 0,
         created_at: new Date().toISOString(),
+        slot: slot || "",
         end_date: endDate || "",
         template_id: "",
         fixed: false,
@@ -1664,6 +1667,7 @@ class HouseholdChoresCard extends HTMLElement {
     assignees,
     weekdays,
     endDate = "",
+    slot = "",
     weekStart = this._weekStartIso(this._weekOffset),
     weekNumber = this._weekNumberForOffset(this._weekOffset),
     spanId = `span_${Math.random().toString(36).slice(2, 10)}`
@@ -1677,6 +1681,7 @@ class HouseholdChoresCard extends HTMLElement {
       column: dayKey,
       order: 0,
       created_at: new Date().toISOString(),
+      slot: slot || "",
       end_date: endDate || "",
       template_id: "",
       fixed: false,
@@ -1713,8 +1718,9 @@ class HouseholdChoresCard extends HTMLElement {
         weekdays: [...form.weekdays],
         excluded_dates: [],
         created_at: new Date().toISOString(),
+        slot: form.slot || "",
       };
-      const instances = this._buildFixedInstancesForCurrentWeek(template, template.title, template.assignees);
+      const instances = this._buildFixedInstancesForCurrentWeek(template, template.title, template.assignees, form.slot || "");
       this._board.templates = [...this._board.templates, template];
       this._board.tasks = [...this._board.tasks, ...instances];
     } else if (form.allDaySpan) {
@@ -1729,10 +1735,10 @@ class HouseholdChoresCard extends HTMLElement {
         this._render();
         return;
       }
-      const allDayInstances = this._buildAllDaySpanInstances(form.title, form.assignees, weekdays, form.endDate || "");
+      const allDayInstances = this._buildAllDaySpanInstances(form.title, form.assignees, weekdays, form.endDate || "", form.slot || "");
       this._board.tasks = [...this._board.tasks, ...allDayInstances];
     } else if (form.weekdays.length > 0) {
-      const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
+      const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "", form.slot || "");
       this._board.tasks = [...this._board.tasks, ...oneOffInstances];
     } else {
       this._board.tasks = [
@@ -1804,8 +1810,9 @@ class HouseholdChoresCard extends HTMLElement {
         weekdays: [...form.weekdays],
         excluded_dates: existingExcludedDates,
         created_at: new Date().toISOString(),
+        slot: form.slot || "",
       };
-      const instances = this._buildFixedInstancesForCurrentWeek(template, template.title, template.assignees);
+      const instances = this._buildFixedInstancesForCurrentWeek(template, template.title, template.assignees, form.slot || "");
       this._board.templates = [...this._board.templates, template];
       this._board.tasks = [...this._board.tasks, ...instances];
     } else {
@@ -1840,13 +1847,14 @@ class HouseholdChoresCard extends HTMLElement {
           form.assignees,
           weekdays,
           form.endDate || "",
+          form.slot || "",
           this._weekStartIso(this._weekOffset),
           this._weekNumberForOffset(this._weekOffset),
           editSpanId || undefined
         );
         this._board.tasks.push(...allDayInstances);
       } else if (form.weekdays.length > 0) {
-        const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "");
+        const oneOffInstances = this._buildOneOffWeekdayInstances(form.title, form.assignees, form.weekdays, form.endDate || "", form.slot || "");
         this._board.tasks.push(...oneOffInstances);
       } else {
         this._board.tasks.push({
