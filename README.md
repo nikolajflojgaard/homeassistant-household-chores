@@ -82,7 +82,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - New overview sensor: `sensor.household_chores_next_3_tasks` (state = 0..3, attributes include task list/titles)
 - New per-person overview sensors: `sensor.household_chores_<person>_next_3_tasks` (state = 0..3)
 - Tasks now support optional lightweight time badges: `AM`, `PM`
-- Tasks show a lightweight saved `AM` / `PM` badge on the card when timing is present
+- Tasks expose direct clickable `AM` / `PM` chips on the card, with only one active at a time
 - Timing remains task metadata rather than a split-lane layout, and saved board state is now returned consistently from both websocket and service save paths
 - Downstream task summaries now preserve `slot` too, so AM/PM timing does not disappear when board-derived sensor payloads refresh
 - AM/PM badges are preserved across single tasks, weekday-generated tasks, fixed tasks, and all-day span task creation/edit flows
