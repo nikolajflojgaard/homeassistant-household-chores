@@ -175,6 +175,7 @@ class HouseholdChoresCard extends HTMLElement {
       fixed: false,
       allDaySpan: false,
       endDate: "",
+      slot: "",
       column: "monday",
       weekdays: [],
       assignees: [],
@@ -982,6 +983,7 @@ class HouseholdChoresCard extends HTMLElement {
       fixed: Boolean(task.fixed),
       allDaySpan: Boolean(task.span_id),
       endDate: task.end_date || tpl?.end_date || "",
+      slot: task.slot || "",
       column: task.column || "monday",
       weekdays,
       assignees: nextAssignees,
@@ -1014,6 +1016,7 @@ class HouseholdChoresCard extends HTMLElement {
       fixed: true,
       allDaySpan: false,
       endDate: tpl.end_date || "",
+      slot: "",
       column: fallbackColumn || "monday",
       weekdays: Array.isArray(tpl.weekdays) ? [...tpl.weekdays] : [],
       assignees,
@@ -1739,7 +1742,8 @@ class HouseholdChoresCard extends HTMLElement {
           column: form.column,
           order: this._tasksForColumn(form.column).length,
           created_at: new Date().toISOString(),
-        end_date: form.endDate || "",
+          slot: form.slot || "",
+          end_date: form.endDate || "",
         template_id: "",
         fixed: false,
         span_id: "",
@@ -1850,6 +1854,7 @@ class HouseholdChoresCard extends HTMLElement {
           column: form.column,
           order: this._tasksForColumn(form.column).length,
           created_at: originalCreatedAt,
+          slot: form.slot || "",
           end_date: form.endDate || "",
           template_id: "",
           fixed: false,
@@ -2345,7 +2350,15 @@ class HouseholdChoresCard extends HTMLElement {
               <input id="task-end-date" type="date" value="${this._escape(form.endDate)}" />
             </div>
             ${this._renderWeekdaySelector(form.weekdays)}
-            ${showWeekdayMode ? "" : `<select id="task-column">${this._columns().map((c) => `<option value="${c.key}" ${form.column === c.key ? "selected" : ""}>${this._escape(this._labelForColumn(c.key))}</option>`).join("")}</select>`}
+            <div class="task-grid-two">
+              ${showWeekdayMode ? "" : `<select id="task-column">${this._columns().map((c) => `<option value="${c.key}" ${form.column === c.key ? "selected" : ""}>${this._escape(this._labelForColumn(c.key))}</option>`).join("")}</select>`}
+              <select id="task-slot">
+                <option value="" ${!form.slot ? "selected" : ""}>Any time</option>
+                <option value="morning" ${form.slot === "morning" ? "selected" : ""}>Morning</option>
+                <option value="afternoon" ${form.slot === "afternoon" ? "selected" : ""}>Afternoon</option>
+                <option value="evening" ${form.slot === "evening" ? "selected" : ""}>Evening</option>
+              </select>
+            </div>
             <div class="assignees">
               ${this._board.people
                 .map(
@@ -2772,6 +2785,7 @@ class HouseholdChoresCard extends HTMLElement {
         .weekday-picks{display:flex;gap:6px;flex-wrap:wrap}
         .weekday-dot{width:28px;height:28px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;padding:0;font-size:.76rem;font-weight:700}
         .weekday-dot.sel{background:#0f766e;border-color:#0f766e;color:#fff}
+        .task-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
         .assignees{display:flex;flex-wrap:wrap;gap:8px}
         .assignees label{display:flex;align-items:center;gap:5px;font-size:.78rem}
         .modal-actions{display:flex;justify-content:space-between;gap:8px}
@@ -2931,6 +2945,7 @@ class HouseholdChoresCard extends HTMLElement {
     const taskForm = this.shadowRoot.querySelector("#task-form");
     const taskTitleInput = this.shadowRoot.querySelector("#task-title");
     const taskColumnInput = this.shadowRoot.querySelector("#task-column");
+    const taskSlotInput = this.shadowRoot.querySelector("#task-slot");
     const taskEndDateInput = this.shadowRoot.querySelector("#task-end-date");
     const taskFixedInput = this.shadowRoot.querySelector("#task-fixed");
     const taskAllDaySpanInput = this.shadowRoot.querySelector("#task-all-day-span");
@@ -3051,6 +3066,7 @@ class HouseholdChoresCard extends HTMLElement {
     if (taskForm) taskForm.addEventListener("submit", (ev) => this._onSubmitTaskForm(ev));
     if (taskTitleInput) taskTitleInput.addEventListener("input", (ev) => this._onTaskFieldInput("title", ev.target.value));
     if (taskColumnInput) taskColumnInput.addEventListener("change", (ev) => this._onTaskFieldInput("column", ev.target.value));
+    if (taskSlotInput) taskSlotInput.addEventListener("change", (ev) => this._onTaskFieldInput("slot", ev.target.value));
     if (taskEndDateInput) taskEndDateInput.addEventListener("change", (ev) => this._onTaskFieldInput("endDate", ev.target.value));
     if (taskFixedInput) {
       taskFixedInput.addEventListener("change", (ev) => {

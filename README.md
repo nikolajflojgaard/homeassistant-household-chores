@@ -82,6 +82,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - New overview sensor: `sensor.household_chores_next_3_tasks` (state = 0..3, attributes include task list/titles)
 - New per-person overview sensors: `sensor.household_chores_<person>_next_3_tasks` (state = 0..3)
 - Tasks now support optional explicit daily slots: `morning`, `afternoon`, `evening`
+- The task modal now lets you pick a slot on both new and existing tasks
 - Response services for dashboards/automations:
   - `household_chores.get_person_tasks`
   - `household_chores.get_week_summary`
