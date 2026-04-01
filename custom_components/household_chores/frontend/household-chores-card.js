@@ -2002,8 +2002,6 @@ class HouseholdChoresCard extends HTMLElement {
   _taskMetaLine(task) {
     if (task.fixed || task.span_id) return "";
     const bits = [];
-    const slot = String(task.slot || "").toLowerCase();
-    if (slot === "am" || slot === "pm") bits.push(slot.toUpperCase());
     if (task.end_date) bits.push(`until ${task.end_date}`);
     return bits.length ? `<div class="task-sub">${this._escape(bits.join(" • "))}</div>` : "";
   }
