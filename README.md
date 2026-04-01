@@ -81,6 +81,7 @@ Household Chores is a HACS-installable custom integration for a weekly household
 - Dynamic person sensors are created automatically (`sensor.household_chores_<person>_tasks`) with weekly counters + task attributes
 - New overview sensor: `sensor.household_chores_next_3_tasks` (state = 0..3, attributes include task list/titles)
 - New per-person overview sensors: `sensor.household_chores_<person>_next_3_tasks` (state = 0..3)
+- Tasks now support optional explicit daily slots: `morning`, `afternoon`, `evening`
 - Response services for dashboards/automations:
   - `household_chores.get_person_tasks`
   - `household_chores.get_week_summary`
@@ -190,12 +191,12 @@ Use Home Assistant service calls with response data enabled:
   - input: `entry_id`, optional `week_offset` (`0..3`)
   - output includes `people[]` summaries + `totals`
 - `household_chores.create_task`
-  - input: optional `entry_id`, required `title`, optional `date` (`YYYY-MM-DD`), optional `assignees[]`, optional `assignee_names[]`
+  - input: optional `entry_id`, required `title`, optional `date` (`YYYY-MM-DD`), optional `slot` (`morning|afternoon|evening`), optional `assignees[]`, optional `assignee_names[]`
   - if exactly one Household Chores board exists, `entry_id` is auto-resolved
   - assignee names are resolved against board people by name (case-insensitive)
   - output includes created `task`, resolved assignees, and unknown assignee names
 - `household_chores.update_task`
-  - input: optional `entry_id`, match via `task_id` or `title` + optional `date` + optional assignees, then update with `new_title`, `new_date`, `new_assignees[]`, `new_assignee_names[]`
+  - input: optional `entry_id`, match via `task_id` or `title` + optional `date` + optional assignees, then update with `new_title`, `new_date`, optional `new_slot`, `new_assignees[]`, `new_assignee_names[]`
   - returns `task_ambiguous` if multiple tasks match instead of guessing
 - `household_chores.delete_task`
   - input: optional `entry_id`, match via `task_id` or `title` + optional `date` + optional assignees

@@ -61,6 +61,7 @@ class Task:
     column: str
     order: int
     created_at: str
+    slot: str | None = None
     end_date: str | None = None
     template_id: str | None = None
     fixed: bool = False
@@ -427,6 +428,8 @@ class HouseholdBoardStore:
 
             order = int(task.get("order", index))
             created_at = str(task.get("created_at") or datetime.now(UTC).isoformat())
+            slot_raw = str(task.get("slot") or "").strip().lower()
+            slot = slot_raw if slot_raw in {"morning", "afternoon", "evening"} else None
             end_date = _parse_date(task.get("end_date"))
             template_id = str(task.get("template_id")) if task.get("template_id") else None
             fixed = bool(task.get("fixed", False))
@@ -454,6 +457,7 @@ class HouseholdBoardStore:
                     "column": column,
                     "order": order,
                     "created_at": created_at,
+                    "slot": slot,
                     "end_date": end_date.isoformat() if end_date else None,
                     "template_id": template_id,
                     "fixed": fixed,
