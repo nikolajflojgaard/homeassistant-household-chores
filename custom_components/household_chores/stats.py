@@ -105,6 +105,7 @@ def person_week_stats(board: dict[str, Any], person_id: str, week_offset: int = 
                 "fixed": bool(raw.get("fixed", False)),
                 "template_id": str(raw.get("template_id") or ""),
                 "end_date": str(raw.get("end_date") or ""),
+                "slot": str(raw.get("slot") or "").lower(),
                 "days": [],
             }
             by_key[key] = item
@@ -219,6 +220,7 @@ def next_three_tasks_summary(
                 "week_number": _week_number(due_day),
                 "assignees": assignee_ids,
                 "assignee_names": assignee_names,
+                "slot": str(raw.get("slot") or "").lower(),
                 "span_id": span_id,
                 "order": int(raw.get("order") or 0),
             }
