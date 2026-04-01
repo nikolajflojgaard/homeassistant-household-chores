@@ -161,7 +161,7 @@ Current UI captures from the latest tablet/compact board layout.
   - After updating + restarting Home Assistant, check logs for: `Household Chores migrated ...`
 
 - The custom card JavaScript is auto-registered by the integration at startup.
-- Repository includes icon/logo fallback files (`icon.png`, `logo.png`, `dark_icon.png`, `dark_logo.png`) for broader HACS/UI icon compatibility.
+- Repository includes icon/logo fallback files (`icon.png`, `logo.png`, `dark_icon.png`, `dark_logo.png`) plus a full `brand/` asset set for broader HACS/UI icon compatibility and better first-load behavior.
 - JS resource is auto versioned (`?v=<manifest version>`) to reduce browser cache issues after updates.
 - External board writes (for example from Weekly Training sync) should refresh the card quickly via board-state change detection, not only after manual card actions.
 - If you update from older versions, restart Home Assistant to reload websocket commands/resources.
