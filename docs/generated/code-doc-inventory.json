@@ -1,0 +1,303 @@
+{
+  "counts": {
+    "deployments": 0,
+    "entrypoints": 0,
+    "files": 36,
+    "flows": 0,
+    "frameworks": 0,
+    "interfaces": 1,
+    "manifests": 0,
+    "routes": 0
+  },
+  "deployments": [],
+  "entrypoints": [],
+  "files": [
+    {
+      "path": "README.md",
+      "size": 13021,
+      "suffix": ".md",
+      "tags": []
+    },
+    {
+      "path": "code-docs.yml",
+      "size": 288,
+      "suffix": ".yml",
+      "tags": []
+    },
+    {
+      "path": "dark_icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "dark_logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "hacs.json",
+      "size": 160,
+      "suffix": ".json",
+      "tags": []
+    },
+    {
+      "path": "icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": ".github/workflows/code-docs.yml",
+      "size": 583,
+      "suffix": ".yml",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/__init__.py",
+      "size": 9319,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/board.py",
+      "size": 22829,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/calendar.py",
+      "size": 2757,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/config_flow.py",
+      "size": 6575,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/const.py",
+      "size": 716,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/coordinator.py",
+      "size": 3134,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/dark_icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/dark_logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/frontend.py",
+      "size": 1333,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/manifest.json",
+      "size": 487,
+      "suffix": ".json",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/sensor.py",
+      "size": 23586,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/services.py",
+      "size": 21698,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/services.yaml",
+      "size": 1532,
+      "suffix": ".yaml",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/stats.py",
+      "size": 9593,
+      "suffix": ".py",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/strings.json",
+      "size": 1536,
+      "suffix": ".json",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/websocket_api.py",
+      "size": 2960,
+      "suffix": ".py",
+      "tags": [
+        "interface"
+      ]
+    },
+    {
+      "path": "custom_components/household_chores/brand/dark_icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/dark_icon@2x.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/dark_logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/dark_logo@2x.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/icon.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/icon@2x.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/logo.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/brand/logo@2x.png",
+      "size": 4591,
+      "suffix": ".png",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/frontend/household-chores-card.js",
+      "size": 148728,
+      "suffix": ".js",
+      "tags": []
+    },
+    {
+      "path": "custom_components/household_chores/translations/en.json",
+      "size": 1536,
+      "suffix": ".json",
+      "tags": []
+    }
+  ],
+  "flows": [],
+  "frameworks": [],
+  "interfaces": [
+    {
+      "path": "custom_components/household_chores/websocket_api.py",
+      "size": 2960,
+      "suffix": ".py",
+      "tags": [
+        "interface"
+      ]
+    }
+  ],
+  "manifests": [],
+  "repo": "homeassistant-household-chores",
+  "root": ".",
+  "routes": [],
+  "tree": {
+    ".github": {
+      "workflows": {
+        "code-docs.yml": null
+      }
+    },
+    "README.md": null,
+    "code-docs.yml": null,
+    "custom_components": {
+      "household_chores": {
+        "__init__.py": null,
+        "board.py": null,
+        "brand": {
+          "dark_icon.png": null,
+          "dark_icon@2x.png": null,
+          "dark_logo.png": null,
+          "dark_logo@2x.png": null,
+          "icon.png": null,
+          "icon@2x.png": null,
+          "logo.png": null,
+          "logo@2x.png": null
+        },
+        "calendar.py": null,
+        "config_flow.py": null,
+        "const.py": null,
+        "coordinator.py": null,
+        "dark_icon.png": null,
+        "dark_logo.png": null,
+        "frontend": {
+          "household-chores-card.js": null
+        },
+        "frontend.py": null,
+        "icon.png": null,
+        "logo.png": null,
+        "manifest.json": null,
+        "sensor.py": null,
+        "services.py": null,
+        "services.yaml": null,
+        "stats.py": null,
+        "strings.json": null,
+        "translations": {
+          "en.json": null
+        },
+        "websocket_api.py": null
+      }
+    },
+    "dark_icon.png": null,
+    "dark_logo.png": null,
+    "hacs.json": null,
+    "icon.png": null,
+    "logo.png": null
+  },
+  "truncated": false
+}
