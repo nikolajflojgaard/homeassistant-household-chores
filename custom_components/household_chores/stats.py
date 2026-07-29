@@ -223,6 +223,9 @@ def next_three_tasks_summary(
                 "slot": str(raw.get("slot") or "").lower(),
                 "span_id": span_id,
                 "order": int(raw.get("order") or 0),
+                "source": raw.get("source"),
+                "source_id": raw.get("source_id"),
+                "source_kind": raw.get("source_kind"),
             }
             grouped[group_key] = item
         else:

@@ -64,6 +64,7 @@ async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry, boa
     }
 
     migrations: list[tuple[str, str]] = []
+    stale_entity_ids: list[str] = []
     for reg_entry in reg_entries:
         if reg_entry.domain != "sensor":
             continue
@@ -72,18 +73,26 @@ async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry, boa
 
         wanted: str | None = None
 
-        if unique_id == f"{entry.entry_id}_next_three_tasks":
+        if unique_id == f"{entry.entry_id}_next_chore":
+            wanted = "sensor.household_chores_next_chore"
+        elif unique_id == f"{entry.entry_id}_board_state":
+            wanted = "sensor.household_chores_board_state"
+        elif unique_id == f"{entry.entry_id}_next_three_tasks":
             wanted = "sensor.household_chores_next_3_tasks"
         elif unique_id.startswith(f"{entry.entry_id}_person_week_"):
             person_id = unique_id.removeprefix(f"{entry.entry_id}_person_week_")
             person_name = name_by_id.get(person_id, "").strip()
             if person_name:
                 wanted = f"sensor.household_chores_{slugify(person_name)}_tasks"
+            else:
+                stale_entity_ids.append(current_entity_id)
         elif unique_id.startswith(f"{entry.entry_id}_next_three_tasks_"):
             person_id = unique_id.removeprefix(f"{entry.entry_id}_next_three_tasks_")
             person_name = name_by_id.get(person_id, "").strip()
             if person_name:
                 wanted = f"sensor.household_chores_{slugify(person_name)}_next_3_tasks"
+            else:
+                stale_entity_ids.append(current_entity_id)
 
         if not wanted:
             continue
@@ -101,8 +110,41 @@ async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry, boa
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Entity migration failed for %s -> %s: %s", current_entity_id, wanted_unique, err)
 
+    for entity_id in stale_entity_ids:
+        try:
+            registry.async_remove(entity_id)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Stale entity cleanup failed for %s: %s", entity_id, err)
+
+    if stale_entity_ids:
+        for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if reg_entry.domain != "sensor":
+                continue
+            unique_id = str(reg_entry.unique_id or "")
+            current_entity_id = reg_entry.entity_id
+            wanted = None
+            if unique_id.startswith(f"{entry.entry_id}_person_week_"):
+                person_id = unique_id.removeprefix(f"{entry.entry_id}_person_week_")
+                person_name = name_by_id.get(person_id, "").strip()
+                if person_name:
+                    wanted = f"sensor.household_chores_{slugify(person_name)}_tasks"
+            elif unique_id.startswith(f"{entry.entry_id}_next_three_tasks_"):
+                person_id = unique_id.removeprefix(f"{entry.entry_id}_next_three_tasks_")
+                person_name = name_by_id.get(person_id, "").strip()
+                if person_name:
+                    wanted = f"sensor.household_chores_{slugify(person_name)}_next_3_tasks"
+            if not wanted or current_entity_id == wanted or registry.async_get(wanted) is not None:
+                continue
+            try:
+                registry.async_update_entity(current_entity_id, new_entity_id=wanted)
+                migrations.append((current_entity_id, wanted))
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Entity migration failed for %s -> %s: %s", current_entity_id, wanted, err)
+
     if migrations:
         _LOGGER.info("Household Chores migrated %d sensor entity_id(s): %s", len(migrations), migrations)
+    if stale_entity_ids:
+        _LOGGER.info("Household Chores removed %d stale sensor entity_id(s): %s", len(stale_entity_ids), stale_entity_ids)
 
     done.add(entry.entry_id)
 
@@ -181,6 +223,10 @@ class NextChoreSensor(CoordinatorEntity[HouseholdChoresCoordinator], SensorEntit
         self._attr_extra_state_attributes = {"household": configured_name}
 
     @property
+    def suggested_object_id(self) -> str | None:
+        return "household_chores_next_chore"
+
+    @property
     def native_value(self) -> str | None:
         """Return summary for the next upcoming chore."""
         now = datetime.now().astimezone()
@@ -216,6 +262,10 @@ class BoardStateSensor(SensorEntity):
         self._board_store = board_store
         self._attr_unique_id = f"{entry.entry_id}_board_state"
         self._unsub_dispatcher = None
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        return "household_chores_board_state"
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to board update events."""
@@ -253,6 +303,8 @@ class BoardStateSensor(SensorEntity):
                 "people": board.get("people", []),
                 "tasks": board.get("tasks", []),
                 "templates": board.get("templates", []),
+                "history": board.get("history", []),
+                "settings": board.get("settings", {}),
                 "updated_at": board.get("updated_at", ""),
             },
         }
@@ -327,10 +379,7 @@ class PersonWeekTasksSensor(SensorEntity):
 
     def _handle_board_updated(self) -> None:
         """Handle board updates from store."""
-        self.hass.async_create_task(self._async_refresh_and_write())
-
-    async def _async_refresh_and_write(self) -> None:
-        await self.async_update()
+        self._refresh_from_board()
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -405,10 +454,8 @@ class NextThreeTasksSensor(SensorEntity):
 
     def _handle_board_updated(self) -> None:
         """Handle board updates from store."""
-        self.hass.async_create_task(self._async_refresh_and_write())
-
-    async def _async_refresh_and_write(self) -> None:
-        await self.async_update()
+        board = getattr(self._board_store, "_data", None) or {}
+        self._summary = next_three_tasks_summary(board, limit=3)
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -481,10 +528,9 @@ class NextThreeTasksPersonSensor(SensorEntity):
         }
 
     def _handle_board_updated(self) -> None:
-        self.hass.async_create_task(self._async_refresh_and_write())
-
-    async def _async_refresh_and_write(self) -> None:
-        await self.async_update()
+        board = getattr(self._board_store, "_data", None) or {}
+        self._refresh_person_fields(board)
+        self._summary = next_three_tasks_summary(board, limit=3, person_id=self.person_id)
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -552,10 +598,8 @@ class TodayTasksSensor(SensorEntity):
 
     def _handle_board_updated(self) -> None:
         """Handle board updates from store."""
-        self.hass.async_create_task(self._async_refresh_and_write())
-
-    async def _async_refresh_and_write(self) -> None:
-        await self.async_update()
+        board = getattr(self._board_store, "_data", None) or {}
+        self._today_stats = self._compute_today_tasks(board)
         self.async_write_ha_state()
 
     async def async_update(self) -> None:

@@ -14,13 +14,13 @@
   "files": [
     {
       "path": "README.md",
-      "size": 13021,
+      "size": 14041,
       "suffix": ".md",
       "tags": []
     },
     {
       "path": "code-docs.yml",
-      "size": 336,
+      "size": 288,
       "suffix": ".yml",
       "tags": []
     },
@@ -68,13 +68,13 @@
     },
     {
       "path": "custom_components/household_chores/board.py",
-      "size": 22829,
+      "size": 28158,
       "suffix": ".py",
       "tags": []
     },
     {
       "path": "custom_components/household_chores/calendar.py",
-      "size": 2757,
+      "size": 3282,
       "suffix": ".py",
       "tags": []
     },
@@ -128,31 +128,31 @@
     },
     {
       "path": "custom_components/household_chores/manifest.json",
-      "size": 487,
+      "size": 488,
       "suffix": ".json",
       "tags": []
     },
     {
       "path": "custom_components/household_chores/sensor.py",
-      "size": 23586,
+      "size": 26042,
       "suffix": ".py",
       "tags": []
     },
     {
       "path": "custom_components/household_chores/services.py",
-      "size": 21698,
+      "size": 34576,
       "suffix": ".py",
       "tags": []
     },
     {
       "path": "custom_components/household_chores/services.yaml",
-      "size": 1532,
+      "size": 7089,
       "suffix": ".yaml",
       "tags": []
     },
     {
       "path": "custom_components/household_chores/stats.py",
-      "size": 9593,
+      "size": 9744,
       "suffix": ".py",
       "tags": []
     },
@@ -220,7 +220,7 @@
     },
     {
       "path": "custom_components/household_chores/frontend/household-chores-card.js",
-      "size": 148728,
+      "size": 150711,
       "suffix": ".js",
       "tags": []
     },

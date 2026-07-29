@@ -62,3 +62,292 @@ get_week_summary:
           min: 0
           max: 3
           mode: box
+
+create_task:
+  name: Create task
+  description: Create one task on the board.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      required: true
+      selector:
+        text:
+    date:
+      name: Date
+      description: Due date as YYYY-MM-DD. Defaults to today.
+      required: false
+      selector:
+        date:
+    slot:
+      name: Time badge
+      required: false
+      selector:
+        select:
+          options:
+            - am
+            - pm
+    assignee_names:
+      name: Assignee names
+      required: false
+      selector:
+        text:
+          multiple: true
+    source:
+      name: Source
+      required: false
+      selector:
+        text:
+    source_id:
+      name: Source ID
+      required: false
+      selector:
+        text:
+    source_kind:
+      name: Source kind
+      required: false
+      selector:
+        text:
+
+update_task:
+  name: Update task
+  description: Find one task by ID or filters, then update title/date/assignees/source metadata.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    task_id:
+      name: Task ID
+      required: false
+      selector:
+        text:
+    title:
+      name: Current title
+      required: false
+      selector:
+        text:
+    date:
+      name: Current date
+      required: false
+      selector:
+        date:
+    source:
+      name: Current source
+      required: false
+      selector:
+        text:
+    source_id:
+      name: Current source ID
+      required: false
+      selector:
+        text:
+    new_title:
+      name: New title
+      required: false
+      selector:
+        text:
+    new_date:
+      name: New date
+      required: false
+      selector:
+        date:
+    new_slot:
+      name: New time badge
+      required: false
+      selector:
+        select:
+          options:
+            - am
+            - pm
+    new_assignee_names:
+      name: New assignee names
+      required: false
+      selector:
+        text:
+          multiple: true
+    new_source:
+      name: New source
+      required: false
+      selector:
+        text:
+    new_source_id:
+      name: New source ID
+      required: false
+      selector:
+        text:
+    new_source_kind:
+      name: New source kind
+      required: false
+      selector:
+        text:
+
+delete_task:
+  name: Delete task
+  description: Delete one task by ID or filters.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    task_id:
+      name: Task ID
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      required: false
+      selector:
+        text:
+    date:
+      name: Date
+      required: false
+      selector:
+        date:
+    source:
+      name: Source
+      required: false
+      selector:
+        text:
+    source_id:
+      name: Source ID
+      required: false
+      selector:
+        text:
+
+list_tasks:
+  name: List tasks
+  description: List board tasks with optional filters for agent and automation lookup.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      required: false
+      selector:
+        text:
+    date:
+      name: Date
+      required: false
+      selector:
+        date:
+    assignee_names:
+      name: Assignee names
+      required: false
+      selector:
+        text:
+          multiple: true
+    source:
+      name: Source
+      required: false
+      selector:
+        text:
+    source_id:
+      name: Source ID
+      required: false
+      selector:
+        text:
+    include_done:
+      name: Include completed
+      default: false
+      required: false
+      selector:
+        boolean:
+    limit:
+      name: Limit
+      default: 50
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+
+upsert_week_plan:
+  name: Upsert week plan
+  description: Create or update a batch of date-based tasks idempotently using source metadata.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    week_start:
+      name: Week start
+      description: Optional Monday date as YYYY-MM-DD.
+      required: false
+      selector:
+        date:
+    source:
+      name: Source
+      default: agent
+      required: false
+      selector:
+        text:
+    source_kind:
+      name: Source kind
+      default: weekly_plan
+      required: false
+      selector:
+        text:
+    dry_run:
+      name: Dry run
+      default: false
+      required: false
+      selector:
+        boolean:
+    tasks:
+      name: Tasks
+      description: List of task objects with title, date, optional slot, assignees/assignee_names, source_id.
+      required: true
+      selector:
+        object:
+
+get_next_up:
+  name: Get next up
+  description: Return overdue, today, and upcoming tasks for dashboards or briefs.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    person_name:
+      name: Person name
+      required: false
+      selector:
+        text:
+    days_ahead:
+      name: Days ahead
+      default: 1
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 14
+          mode: box
+    include_overdue:
+      name: Include overdue
+      default: true
+      required: false
+      selector:
+        boolean:
+    limit:
+      name: Limit
+      default: 8
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box

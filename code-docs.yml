@@ -1,5 +1,4 @@
 docs_dir: docs
-repository_name: homeassistant-household-chores
 service_name: homeassistant-household-chores
 owner: Nikolaj Flojgaard
 strict: true

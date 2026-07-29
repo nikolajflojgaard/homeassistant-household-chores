@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_NAME, DOMAIN
@@ -22,6 +23,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up Household Chores calendar from a config entry."""
     coordinator: HouseholdChoresCoordinator = hass.data[DOMAIN][entry.entry_id]
+    registry = er.async_get(hass)
+    current = registry.async_get_entity_id("calendar", DOMAIN, f"{entry.entry_id}_calendar")
+    if current and current != "calendar.household_chores_schedule" and registry.async_get("calendar.household_chores_schedule") is None:
+        registry.async_update_entity(current, new_entity_id="calendar.household_chores_schedule")
     async_add_entities([HouseholdChoresCalendar(entry, coordinator)])
 
 
@@ -41,6 +46,10 @@ class HouseholdChoresCalendar(CoordinatorEntity[HouseholdChoresCoordinator], Cal
             "members": coordinator.members,
             "chores": coordinator.chores,
         }
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        return "household_chores_schedule"
 
     @property
     def event(self) -> CalendarEvent | None:

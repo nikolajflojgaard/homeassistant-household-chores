@@ -96,6 +96,11 @@ Household Chores is a HACS-installable custom integration for a weekly household
   - `household_chores.update_task`
   - `household_chores.delete_task`
   - `household_chores.list_tasks`
+  - `household_chores.upsert_week_plan`
+  - `household_chores.get_next_up`
+- Source-aware task metadata (`source`, `source_id`, `source_kind`) for safer agent/training/automation writes.
+- Compact completed-task history is retained before weekly cleanup so later summaries can answer what actually got done.
+- Next up mode focuses on overdue, today, and tomorrow tasks for brief/dashboard use.
 
 ## Install (HACS)
 
@@ -211,3 +216,10 @@ Use Home Assistant service calls with response data enabled:
 - `household_chores.list_tasks`
   - input: optional `entry_id`, optional filters `title`, `date`, `assignees[]`, `assignee_names[]`, optional `include_done`, optional `limit`
   - returns task summaries with ids, dates, columns, and assignee names for lookup/use in chat flows
+- `household_chores.upsert_week_plan`
+  - input: optional `entry_id`, optional `week_start`, optional `source`, optional `source_kind`, optional `dry_run`, required `tasks[]`
+  - each task supports: `title`, `date`, optional `slot`, `assignees[]`, `assignee_names[]`, `source_id`, `source`, `source_kind`
+  - returns created/updated/skipped counts plus changed task summaries
+- `household_chores.get_next_up`
+  - input: optional `entry_id`, optional `person_id` or `person_name`, optional `days_ahead`, optional `include_overdue`, optional `limit`
+  - returns overdue/today/upcoming tasks for home briefs and dashboard strips

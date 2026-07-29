@@ -81,6 +81,9 @@ class HouseholdChoresCard extends HTMLElement {
 
   _nextUpItems(limit = 3) {
     const todayIso = this._todayIsoDate();
+    const tomorrow = new Date(`${todayIso}T00:00:00`);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowIso = this._toIsoDate(tomorrow);
     const tasks = this._tasksVisibleByFilter(this._board.tasks || [])
       .filter((task) => String(task.column || "").toLowerCase() !== "done")
       .filter((task) => !task.span_id || Number(task.span_index || 0) === 0);
@@ -89,7 +92,7 @@ class HouseholdChoresCard extends HTMLElement {
     for (const task of tasks) {
       const occurrence = this._taskOccurrenceDate(task);
       if (!occurrence) continue;
-      if (occurrence < todayIso) continue;
+      if (occurrence > tomorrowIso) continue;
       const key = task.span_id ? `span:${task.span_id}:${task.week_start || ""}` : `task:${task.id}`;
       if (!byKey.has(key)) {
         byKey.set(key, { task, occurrence, order: Number(task.order || 0) });
@@ -98,6 +101,9 @@ class HouseholdChoresCard extends HTMLElement {
 
     return [...byKey.values()]
       .sort((a, b) => {
+        const aBucket = a.occurrence < todayIso ? 0 : 1;
+        const bBucket = b.occurrence < todayIso ? 0 : 1;
+        if (aBucket !== bBucket) return aBucket - bBucket;
         if (a.occurrence !== b.occurrence) return a.occurrence < b.occurrence ? -1 : 1;
         if (a.order !== b.order) return a.order - b.order;
         return String(a.task.title || "").localeCompare(String(b.task.title || ""));
@@ -123,9 +129,11 @@ class HouseholdChoresCard extends HTMLElement {
               .join("");
             const remaining = Math.max(0, people.length - maxDots);
             const dateLabel = occurrence ? `<span class="nextup-date">${this._escape(occurrence.slice(5).replace("-", "."))}</span>` : "";
+            const status = occurrence < this._todayIsoDate() ? "Overdue" : occurrence === this._todayIsoDate() ? "Today" : "Tomorrow";
             return `
               <button type="button" class="nextup-pill" data-nextup-task-id="${this._escape(task.id)}" title="${this._escape(task.title)}">
                 ${dateLabel}
+                <span class="nextup-status">${status}</span>
                 <span class="nextup-title">${this._escape(task.title)}</span>
                 ${dots ? `<span class="nextup-dots">${dots}${remaining ? `<span class="nextup-more">+${remaining}</span>` : ""}</span>` : ""}
               </button>
@@ -455,6 +463,7 @@ class HouseholdChoresCard extends HTMLElement {
     const people = Array.isArray(board.people) ? board.people : [];
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
     const templates = Array.isArray(board.templates) ? board.templates : [];
+    const history = Array.isArray(board.history) ? board.history : [];
     const settings = board && typeof board === "object" && board.settings ? board.settings : {};
     const validColumns = this._columns().map((c) => c.key);
 
@@ -502,6 +511,10 @@ class HouseholdChoresCard extends HTMLElement {
           span_total: Number.isFinite(t.span_total) ? t.span_total : 0,
           week_start: isWeekday ? (t.week_start || currentWeekStart) : "",
           week_number: Number.isFinite(t.week_number) ? t.week_number : this._weekNumberForOffset(0),
+          source: String(t.source || ""),
+          source_id: String(t.source_id || ""),
+          source_kind: String(t.source_kind || ""),
+          completed_at: String(t.completed_at || ""),
         };
         })
         .filter((t) => t.title),
@@ -517,6 +530,25 @@ class HouseholdChoresCard extends HTMLElement {
           created_at: tpl.created_at || new Date().toISOString(),
         }))
         .filter((tpl) => tpl.title),
+      history: history
+        .map((item) => ({
+          history_id: String(item.history_id || ""),
+          task_id: String(item.task_id || item.id || ""),
+          title: String(item.title || "").trim(),
+          assignees: normalizeAssignees(item.assignees),
+          slot: (item.slot === "am" || item.slot === "pm") ? item.slot : "",
+          end_date: String(item.end_date || ""),
+          week_start: String(item.week_start || ""),
+          week_number: item.week_number,
+          source: String(item.source || ""),
+          source_id: String(item.source_id || ""),
+          source_kind: String(item.source_kind || ""),
+          completed_at: String(item.completed_at || ""),
+          archived_at: String(item.archived_at || ""),
+          archive_reason: String(item.archive_reason || ""),
+        }))
+        .filter((item) => item.title)
+        .slice(-500),
       settings: {
         ...this._defaultSettings(),
         ...settings,
@@ -1138,10 +1170,12 @@ class HouseholdChoresCard extends HTMLElement {
     if (!task || task.virtual || task.column === "done") return;
     const snapshot = this._snapshotBoard();
     const targets = this._taskSpanGroup(task);
+    const completedAt = new Date().toISOString();
     for (const item of targets) {
       item.column = "done";
       item.week_start = this._weekStartIso(this._weekOffset);
       item.week_number = this._weekNumberForOffset(this._weekOffset);
+      item.completed_at = item.completed_at || completedAt;
     }
     this._reindexAllColumns();
     this._setUndo(targets.length > 1 ? "All-day task moved to Completed" : "Task moved to Completed", snapshot);
@@ -2670,6 +2704,7 @@ class HouseholdChoresCard extends HTMLElement {
         .nextup-pill{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbe3ef;border-radius:999px;padding:6px 10px;font-size:.78rem;color:#0f172a;cursor:pointer;max-width:100%}
         .nextup-pill:active{transform:translateY(1px)}
         .nextup-date{font-size:.72rem;font-weight:800;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 6px}
+        .nextup-status{font-size:.68rem;font-weight:800;text-transform:uppercase;color:#0369a1}
         .nextup-title{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
         .nextup-dots{display:inline-flex;align-items:center;gap:3px;margin-left:2px}
         .nextup-dot{width:8px;height:8px;border-radius:999px;display:inline-block;box-shadow:inset 0 -1px 0 rgba(0,0,0,.15)}
@@ -3290,6 +3325,7 @@ class HouseholdChoresCard extends HTMLElement {
         task.column = columnKey;
         task.week_start = this._weekStartIso(this._weekOffset);
         task.week_number = this._weekNumberForOffset(this._weekOffset);
+        task.completed_at = columnKey === "done" ? task.completed_at || new Date().toISOString() : "";
         this._reindexAllColumns();
         this._setUndo(`Task moved to ${this._labelForColumn(columnKey)}`, snapshot);
         this._render();

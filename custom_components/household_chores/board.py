@@ -70,6 +70,10 @@ class Task:
     span_total: int = 0
     week_start: str | None = None
     week_number: int | None = None
+    source: str | None = None
+    source_id: str | None = None
+    source_kind: str | None = None
+    completed_at: str | None = None
 
 
 class HouseholdBoardStore:
@@ -144,6 +148,7 @@ class HouseholdBoardStore:
         if removed_count == 0:
             return 0
 
+        self._archive_completed_tasks(board, [task for task in tasks if task.get("column") == "done"], "manual_cleanup")
         board["tasks"] = remaining_tasks
         await self.async_save(board)
         return removed_count
@@ -184,6 +189,7 @@ class HouseholdBoardStore:
                         for excluded in (_parse_date(item) for item in template.get("excluded_dates", []))
                         if excluded is not None
                     ],
+                    "slot": _normalize_slot(template.get("slot")),
                     "created_at": str(template.get("created_at") or datetime.now(UTC).isoformat()),
                 }
             )
@@ -200,6 +206,7 @@ class HouseholdBoardStore:
                 # Future-week done tasks (rare) are preserved.
                 current_week_number = _week_number_for_day(today)
                 if task_week_number is None or task_week_number <= current_week_number:
+                    self._archive_completed_tasks(board, [task], "weekly_refresh")
                     continue
                 kept_tasks.append(task)
                 continue
@@ -263,13 +270,17 @@ class HouseholdBoardStore:
                                 column=weekday,
                                 order=0,
                                 created_at=datetime.now(UTC).isoformat(),
-                            end_date=end_date.isoformat(),
-                            template_id=template["id"],
-                            fixed=True,
-                            week_start=week_start.isoformat(),
-                            week_number=_week_number_for_day(week_start),
+                                slot=template.get("slot"),
+                                end_date=end_date.isoformat(),
+                                template_id=template["id"],
+                                fixed=True,
+                                week_start=week_start.isoformat(),
+                                week_number=_week_number_for_day(week_start),
+                                source="template",
+                                source_id=template["id"],
+                                source_kind="fixed",
+                            )
                         )
-                    )
                     )
 
         return generated
@@ -304,6 +315,7 @@ class HouseholdBoardStore:
             "people": [asdict(person) for person in people],
             "tasks": [asdict(task) for task in tasks],
             "templates": [],
+            "history": [],
             "settings": self._default_settings(),
             "updated_at": created,
         }
@@ -350,6 +362,7 @@ class HouseholdBoardStore:
         people = board.get("people", []) if isinstance(board, dict) else []
         tasks = board.get("tasks", []) if isinstance(board, dict) else []
         templates = board.get("templates", []) if isinstance(board, dict) else []
+        history = board.get("history", []) if isinstance(board, dict) else []
         raw_settings = board.get("settings", {}) if isinstance(board, dict) else {}
 
         normalized_people: list[dict[str, Any]] = []
@@ -401,9 +414,46 @@ class HouseholdBoardStore:
                     "end_date": end_date.isoformat(),
                     "weekdays": weekdays,
                     "excluded_dates": sorted(set(excluded_dates)),
+                    "slot": _normalize_slot(template.get("slot")),
                     "created_at": str(template.get("created_at") or datetime.now(UTC).isoformat()),
                 }
             )
+
+        normalized_history: list[dict[str, Any]] = []
+        seen_history_keys: set[str] = set()
+        for item in history:
+            if not isinstance(item, dict):
+                continue
+            task_id = str(item.get("task_id") or item.get("id") or "").strip()
+            title = str(item.get("title") or "").strip()
+            archived_at = str(item.get("archived_at") or "").strip()
+            if not title:
+                continue
+            history_key = str(item.get("history_id") or f"{task_id}:{title}:{archived_at}").strip()
+            if history_key in seen_history_keys:
+                continue
+            seen_history_keys.add(history_key)
+            assignees = [str(person_id) for person_id in item.get("assignees", []) if str(person_id) in known_person_ids]
+            normalized_history.append(
+                {
+                    "history_id": history_key or f"hist_{uuid4().hex[:12]}",
+                    "task_id": task_id,
+                    "title": title,
+                    "assignees": assignees,
+                    "column": str(item.get("column") or "done"),
+                    "slot": _normalize_slot(item.get("slot")),
+                    "end_date": str(item.get("end_date") or ""),
+                    "week_start": str(item.get("week_start") or ""),
+                    "week_number": item.get("week_number"),
+                    "source": _normalize_optional_text(item.get("source")),
+                    "source_id": _normalize_optional_text(item.get("source_id")),
+                    "source_kind": _normalize_optional_text(item.get("source_kind")),
+                    "completed_at": str(item.get("completed_at") or ""),
+                    "archived_at": archived_at,
+                    "archive_reason": str(item.get("archive_reason") or "cleanup"),
+                }
+            )
+        normalized_history = normalized_history[-500:]
 
         normalized_tasks: list[dict[str, Any]] = []
         for index, task in enumerate(tasks):
@@ -428,8 +478,7 @@ class HouseholdBoardStore:
 
             order = int(task.get("order", index))
             created_at = str(task.get("created_at") or datetime.now(UTC).isoformat())
-            slot_raw = str(task.get("slot") or "").strip().lower()
-            slot = slot_raw if slot_raw in {"am", "pm"} else None
+            slot = _normalize_slot(task.get("slot"))
             end_date = _parse_date(task.get("end_date"))
             template_id = str(task.get("template_id")) if task.get("template_id") else None
             fixed = bool(task.get("fixed", False))
@@ -466,6 +515,10 @@ class HouseholdBoardStore:
                     "span_total": span_total,
                     "week_start": week_start.isoformat() if week_start else None,
                     "week_number": week_number,
+                    "source": _normalize_optional_text(task.get("source")),
+                    "source_id": _normalize_optional_text(task.get("source_id")),
+                    "source_kind": _normalize_optional_text(task.get("source_kind")),
+                    "completed_at": _normalize_optional_text(task.get("completed_at")),
                 }
             )
 
@@ -522,9 +575,59 @@ class HouseholdBoardStore:
             "people": normalized_people,
             "tasks": normalized_tasks,
             "templates": normalized_templates,
+            "history": normalized_history,
             "settings": settings,
             "updated_at": datetime.now(UTC).isoformat(),
         }
+
+    def _archive_completed_tasks(
+        self,
+        board: dict[str, Any],
+        tasks: list[dict[str, Any]],
+        reason: str,
+    ) -> None:
+        """Append completed tasks to compact history before cleanup removes them."""
+        if not tasks:
+            return
+
+        archived_at = datetime.now(UTC).isoformat()
+        history = list(board.get("history", [])) if isinstance(board.get("history"), list) else []
+        existing_keys = {
+            str(item.get("history_id") or "")
+            for item in history
+            if isinstance(item, dict)
+        }
+
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            task_id = str(task.get("id") or "")
+            completed_at = str(task.get("completed_at") or archived_at)
+            history_id = f"{task_id}:{completed_at}:{reason}"
+            if history_id in existing_keys:
+                continue
+            existing_keys.add(history_id)
+            history.append(
+                {
+                    "history_id": history_id,
+                    "task_id": task_id,
+                    "title": str(task.get("title") or "Untitled task"),
+                    "assignees": [str(item) for item in task.get("assignees", [])],
+                    "column": str(task.get("column") or "done"),
+                    "slot": _normalize_slot(task.get("slot")),
+                    "end_date": str(task.get("end_date") or ""),
+                    "week_start": str(task.get("week_start") or ""),
+                    "week_number": task.get("week_number"),
+                    "source": _normalize_optional_text(task.get("source")),
+                    "source_id": _normalize_optional_text(task.get("source_id")),
+                    "source_kind": _normalize_optional_text(task.get("source_kind")),
+                    "completed_at": completed_at,
+                    "archived_at": archived_at,
+                    "archive_reason": reason,
+                }
+            )
+
+        board["history"] = history[-500:]
 
 
 def _parse_date(value: Any) -> date | None:
@@ -548,6 +651,16 @@ def _week_start_for_day(day_value: date) -> date:
 def _week_number_for_day(day_value: date) -> int:
     """Return ISO week number for a date."""
     return day_value.isocalendar().week
+
+
+def _normalize_optional_text(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    return raw or None
+
+
+def _normalize_slot(value: Any) -> str | None:
+    raw = str(value or "").strip().lower()
+    return raw if raw in {"am", "pm"} else None
 
 
 def _safe_int(value: Any, default: int) -> int:
