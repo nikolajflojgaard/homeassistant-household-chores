@@ -14,7 +14,7 @@
   "files": [
     {
       "path": "README.md",
-      "size": 14041,
+      "size": 14036,
       "suffix": ".md",
       "tags": []
     },
@@ -220,7 +220,7 @@
     },
     {
       "path": "custom_components/household_chores/frontend/household-chores-card.js",
-      "size": 150711,
+      "size": 151184,
       "suffix": ".js",
       "tags": []
     },

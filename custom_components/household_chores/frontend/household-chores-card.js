@@ -194,6 +194,7 @@ class HouseholdChoresCard extends HTMLElement {
 
   _defaultSettings() {
     return {
+      settings_version: 2,
       title: this._config?.title || "Household Chores",
       theme: "light",
       compact_mode: false,
@@ -213,7 +214,7 @@ class HouseholdChoresCard extends HTMLElement {
       },
       weekly_refresh: { weekday: 6, hour: 0, minute: 30 },
       quick_templates: [],
-      gestures: { swipe_complete: true, swipe_delete: false },
+      gestures: { swipe_complete: true, swipe_delete: true },
       onboarding_dismissed: false,
     };
   }
@@ -465,6 +466,16 @@ class HouseholdChoresCard extends HTMLElement {
     const templates = Array.isArray(board.templates) ? board.templates : [];
     const history = Array.isArray(board.history) ? board.history : [];
     const settings = board && typeof board === "object" && board.settings ? board.settings : {};
+    const defaultSettings = this._defaultSettings();
+    const rawGestures = settings.gestures || {};
+    const rawSettingsVersion = Number(settings.settings_version || 0);
+    const gestures = {
+      ...defaultSettings.gestures,
+      ...rawGestures,
+    };
+    if (rawSettingsVersion < 2 && rawGestures.swipe_delete === false) {
+      gestures.swipe_delete = true;
+    }
     const validColumns = this._columns().map((c) => c.key);
 
     const currentWeekStart = this._weekStartIso(0);
@@ -550,23 +561,21 @@ class HouseholdChoresCard extends HTMLElement {
         .filter((item) => item.title)
         .slice(-500),
       settings: {
-        ...this._defaultSettings(),
+        ...defaultSettings,
         ...settings,
+        settings_version: Math.max(rawSettingsVersion, defaultSettings.settings_version),
         labels: {
-          ...this._defaultSettings().labels,
+          ...defaultSettings.labels,
           ...(settings.labels || {}),
         },
         weekly_refresh: {
-          ...this._defaultSettings().weekly_refresh,
+          ...defaultSettings.weekly_refresh,
           ...(settings.weekly_refresh || {}),
         },
         quick_templates: Array.isArray(settings.quick_templates)
           ? [...new Set(settings.quick_templates.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24)
-          : [...this._defaultSettings().quick_templates],
-        gestures: {
-          ...this._defaultSettings().gestures,
-          ...(settings.gestures || {}),
-        },
+          : [...defaultSettings.quick_templates],
+        gestures,
         onboarding_dismissed: Boolean(settings.onboarding_dismissed),
         show_next_up: Boolean(settings.show_next_up),
         show_upcoming: Boolean(settings.show_upcoming ?? true),
@@ -1314,6 +1323,7 @@ class HouseholdChoresCard extends HTMLElement {
     ev.preventDefault();
     const next = JSON.parse(JSON.stringify(this._settingsForm || this._defaultSettings()));
     next.theme = ["light", "dark", "colorful"].includes(next.theme) ? next.theme : "light";
+    next.settings_version = Math.max(Number(next.settings_version || 0), this._defaultSettings().settings_version);
     next.compact_mode = Boolean(next.compact_mode);
     next.show_swipe_hint = Boolean(next.show_swipe_hint);
     next.show_next_up = Boolean(next.show_next_up);
@@ -1324,7 +1334,7 @@ class HouseholdChoresCard extends HTMLElement {
       : [];
     next.gestures = {
       swipe_complete: Boolean(next.gestures?.swipe_complete ?? true),
-      swipe_delete: Boolean(next.gestures?.swipe_delete ?? false),
+      swipe_delete: Boolean(next.gestures?.swipe_delete ?? true),
     };
     next.onboarding_dismissed = Boolean(next.onboarding_dismissed);
     this._board.settings = next;
