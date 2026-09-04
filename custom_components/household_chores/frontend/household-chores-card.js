@@ -1315,6 +1315,8 @@ class HouseholdChoresCard extends HTMLElement {
       await this._quickMoveTaskToCompleted(swipe.taskId);
     } else if (dx < -76 && horizontalEnough && swipe.taskId && deleteEnabled && gestureAge > 60) {
       this._suppressTaskClickUntil = Date.now() + 500;
+      taskEl.classList.add("swipe-delete-preview", "swipe-delete-confirmed");
+      await new Promise((resolve) => setTimeout(resolve, 120));
       await this._quickDeleteTask(swipe.taskId, { viaSwipe: true });
     }
   }
@@ -2822,7 +2824,8 @@ class HouseholdChoresCard extends HTMLElement {
         .task.span-task.span-mid{border-radius:6px}
         .task.span-task.span-end{border-radius:6px 10px 10px 6px}
         .task.swipe-complete-preview{background:#dcfce7;border-color:#86efac;box-shadow:inset 3px 0 0 #16a34a}
-        .task.swipe-delete-preview{background:#fee2e2;border-color:#fca5a5;box-shadow:inset 3px 0 0 #dc2626}
+        .task.swipe-delete-preview{background:#fee2e2;border-color:#fca5a5;box-shadow:inset -3px 0 0 #dc2626}
+        .task.swipe-delete-confirmed{background:#fecaca;border-color:#ef4444;color:#7f1d1d}
         .task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
         .task-title{
           font-size:.78rem;
